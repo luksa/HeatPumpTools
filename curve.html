@@ -169,6 +169,7 @@
                     titleSpan.style.display = 'inline';
                     updateChart();
                     updateURL();
+                    calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
                 };
 
                 input.addEventListener('blur', finishEditing);
