@@ -28,6 +28,19 @@
             margin-right: 0.5rem;
             margin-bottom: 0.5rem;
         }
+        .narrow-input {
+            max-width: 100px;
+        }
+        .lwt-input-group {
+            min-width: 320px;
+        }
+        #lwt-results p {
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .lwt-row {
+            align-items: flex-start;
+        }
     </style>
 </head>
 <body>
@@ -41,13 +54,38 @@
         <p class="mb-4">Enter points for each curve. The graph shows horizontal lines extending left and right from the points, with a sloped line in between. Share the page URL to preserve the curves.</p>
         
         <div class="row">
-            <div class="col-md-4">
+            <!-- Left column: curve inputs only -->
+            <div class="col-md-4 order-md-1 order-2">
                 <div id="curves-container" class="mb-4"></div>
-                <button id="add-curve" class="btn btn-primary mb-4">Add Curve</button>
+                <button id="add-curve" class="btn btn-primary mb-4">Add another curve</button>
+            </div>
+            
+            <!-- Right column: graph + LWT calculator + share -->
+            <div class="col-md-8 order-md-2 order-1">
+                <canvas id="chart" class="mb-4"></canvas>
                 
+                <!-- LWT Calculator – full width under the graph -->
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h5 class="card-title">Share this configuration</h5>
+                        <h5 class="card-title mb-3">What's my LWT at a given outdoor temperature?</h5>
+                        <div class="row lwt-row">
+                            <div class="col">
+                                <div class="input-group lwt-input-group">
+                                    <span class="input-group-text">Outdoor Temp (°C)</span>
+                                    <input id="oat-input" type="number" step="0.1" class="form-control" placeholder="e.g. 5">
+                                </div>
+                            </div>
+                            <div class="col" id="lwt-results">
+                                <!-- Results will appear here, aligned to top -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Share box -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Share this curve</h5>
                         <div class="share-buttons">
                             <button id="copy-clipboard" class="btn btn-secondary">
                                 <i class="fas fa-copy"></i> Copy Link
@@ -68,20 +106,6 @@
                         <small id="copy-feedback" class="text-success d-none">Link copied to clipboard!</small>
                     </div>
                 </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Calculate LWT for a Given Outdoor Temperature</h5>
-                        <div class="mb-3">
-                            <label for="oat-input" class="form-label">Outdoor Temperature (°C):</label>
-                            <input id="oat-input" type="number" step="0.1" class="form-control">
-                        </div>
-                        <div id="lwt-results"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-8">
-                <canvas id="chart"></canvas>
             </div>
         </div>
     </div>
@@ -89,10 +113,11 @@
     <script>
         let curves = [];
         let chart;
-        const SUGGESTED_MIN_X = -30;
-        const SUGGESTED_MAX_X = 30;
-        const SUGGESTED_MIN_Y = 0;
-        const SUGGESTED_MAX_Y = 80;
+        const DEFAULT_MIN_X = -10;
+        const DEFAULT_MAX_X = 30;
+        const DEFAULT_MIN_Y = 20;
+        const DEFAULT_MAX_Y = 60;
+        const EXTEND_PADDING = 10;
         const SEPARATOR = ',';
 
         function addCurve(data = {x1: -10, y1: 55, x2: 15, y2: 25}) {
@@ -102,30 +127,39 @@
             div.innerHTML = `
                 <div class="card-body">
                     <h5 class="card-title">Curve</h5>
-                    <div class="row mb-3 align-items-center">
-                        <label class="col-sm-6 col-form-label text-sm-end">X1 (Low OAT °C):</label>
-                        <div class="col-sm-6">
-                            <input type="number" class="form-control x1" value="${data.x1}" step="0.1">
+                    
+                    <div class="mb-4">
+                        <h6 class="fw-bold">Low Outdoor Temperature Point</h6>
+                        <div class="row align-items-center">
+                            <label class="col-sm-6 col-form-label text-sm-end">Outdoor Temp (°C):</label>
+                            <div class="col-sm-6">
+                                <input type="number" class="form-control narrow-input x1" value="${data.x1}" step="0.1">
+                            </div>
+                        </div>
+                        <div class="row align-items-center">
+                            <label class="col-sm-6 col-form-label text-sm-end">LWT (°C):</label>
+                            <div class="col-sm-6">
+                                <input type="number" class="form-control narrow-input y1" value="${data.y1}" step="0.1">
+                            </div>
                         </div>
                     </div>
-                    <div class="row mb-3 align-items-center">
-                        <label class="col-sm-6 col-form-label text-sm-end">Y1 (High LWT °C):</label>
-                        <div class="col-sm-6">
-                            <input type="number" class="form-control y1" value="${data.y1}" step="0.1">
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">High Outdoor Temperature Point</h6>
+                        <div class="row align-items-center">
+                            <label class="col-sm-6 col-form-label text-sm-end">Outdoor Temp (°C):</label>
+                            <div class="col-sm-6">
+                                <input type="number" class="form-control narrow-input x2" value="${data.x2}" step="0.1">
+                            </div>
+                        </div>
+                        <div class="row align-items-center">
+                            <label class="col-sm-6 col-form-label text-sm-end">LWT (°C):</label>
+                            <div class="col-sm-6">
+                                <input type="number" class="form-control narrow-input y2" value="${data.y2}" step="0.1">
+                            </div>
                         </div>
                     </div>
-                    <div class="row mb-3 align-items-center">
-                        <label class="col-sm-6 col-form-label text-sm-end">X2 (High OAT °C):</label>
-                        <div class="col-sm-6">
-                            <input type="number" class="form-control x2" value="${data.x2}" step="0.1">
-                        </div>
-                    </div>
-                    <div class="row mb-3 align-items-center">
-                        <label class="col-sm-6 col-form-label text-sm-end">Y2 (Low LWT °C):</label>
-                        <div class="col-sm-6">
-                            <input type="number" class="form-control y2" value="${data.y2}" step="0.1">
-                        </div>
-                    </div>
+                    
                     <button class="btn btn-danger remove">Remove Curve</button>
                 </div>
             `;
@@ -159,10 +193,6 @@
             updateChart();
             updateURL();
             updateShareLinks();
-            const oat = parseFloat(document.getElementById('oat-input').value);
-            if (!isNaN(oat)) {
-                calculateLWT(oat);
-            }
         }
 
         function getLWTForCurve(curve, oat) {
@@ -179,22 +209,31 @@
             if (chart) chart.destroy();
             const ctx = document.getElementById('chart').getContext('2d');
 
+            let allX = [];
+            curves.forEach(c => {
+                allX.push(c.x1, c.x2);
+            });
+
+            let minX = DEFAULT_MIN_X;
+            let maxX = DEFAULT_MAX_X;
+
+            if (allX.length > 0) {
+                const actualMin = Math.min(...allX);
+                const actualMax = Math.max(...allX);
+                minX = Math.min(minX, actualMin - EXTEND_PADDING);
+                maxX = Math.max(maxX, actualMax + EXTEND_PADDING);
+            }
+
             const datasets = curves.map((c, i) => {
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
                 const leftPoint = points[0];
                 const rightPoint = points[1];
 
-                let leftExtendX = SUGGESTED_MIN_X;
-                if (leftPoint.x < SUGGESTED_MIN_X) leftExtendX = leftPoint.x - 10;
-
-                let rightExtendX = SUGGESTED_MAX_X;
-                if (rightPoint.x > SUGGESTED_MAX_X) rightExtendX = rightPoint.x + 10;
-
                 const data = [
-                    {x: leftExtendX, y: leftPoint.y},
+                    {x: minX, y: leftPoint.y},
                     {x: leftPoint.x, y: leftPoint.y},
                     {x: rightPoint.x, y: rightPoint.y},
-                    {x: rightExtendX, y: rightPoint.y}
+                    {x: maxX, y: rightPoint.y}
                 ];
 
                 return {
@@ -204,8 +243,10 @@
                     backgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
                     fill: false,
                     tension: 0,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    showLine: true,
+                    spanGaps: false
                 };
             });
 
@@ -214,12 +255,12 @@
                 data: { datasets },
                 options: {
                     interaction: {
-                        mode: 'x',
+                        mode: 'index',
                         intersect: false
                     },
                     plugins: {
                         tooltip: {
-                            mode: 'x',
+                            mode: 'index',
                             intersect: false,
                             callbacks: {
                                 title: function(tooltipItems) {
@@ -228,20 +269,12 @@
                                     const roundedX = Math.round(rawX);
                                     return `Outdoor Temp: ${roundedX} °C`;
                                 },
-                                label: () => '',
-                                beforeBody: function(tooltipItems) {
-                                    if (tooltipItems.length === 0) return '';
-                                    const rawX = tooltipItems[0].parsed.x;
-                                    const oat = Math.round(rawX);
-
-                                    const lines = [];
-                                    tooltipItems.forEach(item => {
-                                        const curveIndex = item.datasetIndex;
-                                        const curve = curves[curveIndex];
-                                        const lwt = getLWTForCurve(curve, oat);
-                                        lines.push(`Curve ${curveIndex + 1}: LWT ${lwt.toFixed(1)} °C`);
-                                    });
-                                    return lines.join('\n');
+                                label: function(context) {
+                                    const curveIndex = context.datasetIndex;
+                                    const curve = curves[curveIndex];
+                                    const oat = Math.round(context.parsed.x);
+                                    const lwt = getLWTForCurve(curve, oat);
+                                    return `Curve ${curveIndex + 1}: LWT ${lwt.toFixed(1)} °C`;
                                 }
                             }
                         }
@@ -251,14 +284,15 @@
                             type: 'linear',
                             position: 'bottom',
                             title: { display: true, text: 'Outdoor Temperature (°C)' },
-                            suggestedMin: SUGGESTED_MIN_X,
-                            suggestedMax: SUGGESTED_MAX_X,
+                            min: minX,
+                            max: maxX,
                             ticks: { stepSize: 5 }
                         },
                         y: {
                             title: { display: true, text: 'Leaving Water Temperature (°C)' },
-                            suggestedMin: SUGGESTED_MIN_Y,
-                            suggestedMax: SUGGESTED_MAX_Y
+                            min: DEFAULT_MIN_Y,
+                            max: DEFAULT_MAX_Y,
+                            ticks: { stepSize: 5 }
                         }
                     }
                 }
@@ -274,20 +308,23 @@
                 queryParts.push(`curve${i + 1}=${value}`);
             });
 
-            // Sort for consistent order
+            const oatInput = document.getElementById('oat-input');
+            const oat = parseFloat(oatInput.value);
+            if (!isNaN(oat)) {
+                queryParts.push(`oat=${oat}`);
+            }
+
             queryParts.sort();
 
             const newQuery = queryParts.join('&');
             const newUrl = newQuery ? `${base}?${newQuery}` : base;
 
-            // Use replaceState with the raw string - no URLSearchParams encoding
             history.replaceState(null, '', newUrl);
         }
 
         function updateShareLinks() {
             const url = encodeURIComponent(window.location.href);
             const title = encodeURIComponent(document.title);
-
             document.getElementById('share-facebook').href = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
             document.getElementById('share-x').href = `https://twitter.com/intent/tweet?url=${url}&text=${title}`;
             document.getElementById('share-whatsapp').href = `https://wa.me/?text=${title}%20${url}`;
@@ -306,17 +343,13 @@
         }
 
         function loadFromURL() {
-            const search = window.location.search.substring(1); // remove leading ?
+            const search = window.location.search.substring(1);
             if (!search) {
                 addCurve();
                 return;
             }
-
             const params = new URLSearchParams(search);
-            const curveKeys = Array.from(params.keys())
-                .filter(k => k.startsWith('curve'))
-                .sort();
-
+            const curveKeys = Array.from(params.keys()).filter(k => k.startsWith('curve')).sort();
             curveKeys.forEach(key => {
                 const vals = params.get(key).split(SEPARATOR);
                 if (vals.length === 4) {
@@ -330,9 +363,15 @@
                 }
             });
 
-            if (curveKeys.length === 0) {
-                addCurve();
+            if (params.has('oat')) {
+                const oat = parseFloat(params.get('oat'));
+                if (!isNaN(oat)) {
+                    document.getElementById('oat-input').value = oat;
+                    calculateLWT(oat);
+                }
             }
+
+            if (curveKeys.length === 0) addCurve();
         }
 
         function calculateLWT(oat) {
@@ -342,7 +381,6 @@
             curves.forEach((c, i) => {
                 const lwt = getLWTForCurve(c, oat);
                 const p = document.createElement('p');
-                p.className = 'mb-0';
                 p.textContent = `Curve ${i + 1}: LWT = ${lwt.toFixed(2)} °C`;
                 results.appendChild(p);
             });
@@ -359,6 +397,7 @@
         document.getElementById('oat-input').addEventListener('input', (e) => {
             const oat = parseFloat(e.target.value);
             calculateLWT(oat);
+            updateURL();
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
