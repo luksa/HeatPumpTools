@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         body { padding: 20px; }
         #chart { max-height: 600px; cursor: crosshair; }
@@ -26,13 +25,19 @@
         .lwt-input-group { min-width: 320px; }
         #lwt-results p { margin-bottom: 0.5rem; font-weight: 500; }
         .lwt-row { align-items: flex-start; }
-        .curve-title-wrapper { display: flex; align-items: center; gap: 6px; }
-        .curve-title { cursor: pointer; min-width: 60px; }
-        .edit-icon { cursor: pointer; font-size: 0.85em; opacity: 0.5; transition: opacity 0.2s; }
-        .curve-title-wrapper:hover .edit-icon { opacity: 0.8; }
-        .curve-title-input { display: inline-block; width: auto; min-width: 100px; }
         footer { margin-top: 4rem; text-align: center; color: #6c757d; font-size: 0.85rem; }
         .inputs-column { max-width: 400px; }
+        /* Proper tab connection */
+        .nav-tabs .nav-link {
+            border-bottom-color: transparent;
+        }
+        .tab-content {
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 0.375rem 0.375rem;
+            padding: 1.5rem;
+            background-color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -48,16 +53,17 @@
             Define each curve by two points, add multiple curves for easy comparison, and instantly see the leaving water temperature (LWT)
             for all curves at any chosen outdoor temperature.
         </p>
-      
+     
         <div class="row">
             <div class="col-md-4 order-md-1 mb-4 mb-md-0 inputs-column">
-                <div id="curves-container" class="mb-4"></div>
-                <button id="add-curve" class="btn btn-primary">Add Another Curve</button>
+                <ul class="nav nav-tabs mb-0" id="curveTabs" role="tablist"></ul>
+                <div class="tab-content" id="curveTabContent"></div>
+                <button id="add-curve" class="btn btn-primary mt-3">Add Another Curve</button>
             </div>
-          
+         
             <div class="col-md-8 order-md-2">
                 <canvas id="chart" class="mb-4"></canvas>
-              
+             
                 <div class="card mb-4">
                     <div class="card-body">
                         <h5 class="card-title mb-3">What's my LWT at a given outdoor temperature?</h5>
@@ -73,7 +79,7 @@
                         </div>
                     </div>
                 </div>
-              
+             
                 <div class="card">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -93,7 +99,27 @@
         <a href="https://grok.com" target="_blank">Grok</a>.
         Inspired by <a href="https://vscope.at/heizkurve" target="_blank">vscope.at/heizkurve</a>.
     </footer>
-  
+
+    <!-- Bootstrap Rename Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1" aria-labelledby="renameModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameModalLabel">Rename Curve</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="renameInput" class="form-label">Curve name</label>
+                    <input type="text" class="form-control" id="renameInput">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="renameSave">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let curves = [];
         let chart;
@@ -106,147 +132,169 @@
         const RIGHT_PADDING = 5;
         const SEPARATOR = ',';
 
-        function roundTo5(num) {
-            return Math.round(num / 5) * 5;
-        }
+        function roundTo5(num) { return Math.round(num / 5) * 5; }
+        function ceilTo5(num) { return Math.ceil(num / 5) * 5; }
+        function floorTo5(num) { return Math.floor(num / 5) * 5; }
 
-        function ceilTo5(num) {
-            return Math.ceil(num / 5) * 5;
-        }
+        let renameModal = null;
+        let renameInput = null;
+        let renameSave = null;
+        let currentRenameIndex = -1;
 
-        function floorTo5(num) {
-            return Math.floor(num / 5) * 5;
-        }
-
-        function makeTitleEditable(wrapper, titleSpan, index) {
-            wrapper.addEventListener('click', () => {
-                const currentText = titleSpan.textContent.trim();
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.value = currentText;
-                input.className = 'form-control curve-title-input d-inline-block';
-                titleSpan.style.display = 'none';
-                wrapper.insertBefore(input, titleSpan.nextSibling);
-                input.focus();
-                input.select();
-                const finishEditing = () => {
-                    const newName = input.value.trim() || `Curve ${index + 1}`;
-                    curves[index].name = newName;
-                    titleSpan.textContent = newName;
-                    input.remove();
-                    titleSpan.style.display = 'inline';
-                    updateChart();
-                    updateURL();
-                    calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
-                };
-                input.addEventListener('blur', finishEditing);
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') finishEditing();
-                    else if (e.key === 'Escape') {
-                        input.remove();
-                        titleSpan.style.display = 'inline';
-                    }
-                });
+        function openRenameModal(index) {
+            currentRenameIndex = index;
+            renameInput.value = curves[index].name;
+            renameModal.show();
+            renameModal._element.addEventListener('shown.bs.modal', function handler() {
+                renameInput.focus();
+                renameInput.select();
+                renameModal._element.removeEventListener('shown.bs.modal', handler);
             });
+        }
+
+        function saveRename() {
+            if (currentRenameIndex === -1) return;
+            const newName = renameInput.value.trim() || `Curve ${currentRenameIndex + 1}`;
+            curves[currentRenameIndex].name = newName;
+            updateTabsAndContent();
+            updateChart();
+            updateURL();
+            calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
+            renameModal.hide();
         }
 
         function updateRemoveButtons() {
-            const cards = document.querySelectorAll('#curves-container > .card');
-            cards.forEach(card => {
-                const removeBtn = card.querySelector('.remove');
-                if (cards.length === 1) {
-                    if (removeBtn) removeBtn.style.display = 'none';
-                } else {
-                    if (removeBtn) removeBtn.style.display = 'block';
-                }
+            document.querySelectorAll('.remove').forEach(btn => {
+                btn.style.display = curves.length === 1 ? 'none' : 'block';
             });
         }
 
-        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null}) {
-            const container = document.getElementById('curves-container');
-            const div = document.createElement('div');
-            div.className = 'card mb-3';
-            const index = container.children.length;
-            const defaultName = `Curve ${index + 1}`;
-            const name = data.name || defaultName;
-            div.innerHTML = `
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <div class="curve-title-wrapper">
-                            <span class="curve-title">${name}</span>
-                            <i class="bi bi-pencil edit-icon"></i>
-                        </div>
-                    </h5>
+        function updateTabsAndContent() {
+            const tabList = document.getElementById('curveTabs');
+            const tabContent = document.getElementById('curveTabContent');
+            tabList.innerHTML = '';
+            tabContent.innerHTML = '';
+
+            curves.forEach((curve, i) => {
+                const tabId = `curve-tab-${i}`;
+                const li = document.createElement('li');
+                li.className = 'nav-item';
+                li.role = 'presentation';
+                li.innerHTML = `
+                    <button class="nav-link ${i === 0 ? 'active' : ''}" 
+                            id="${tabId}-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#${tabId}" 
+                            type="button" role="tab">
+                        ${curve.name}
+                    </button>`;
+                tabList.appendChild(li);
+
+                const pane = document.createElement('div');
+                pane.className = `tab-pane fade ${i === 0 ? 'show active' : ''}`;
+                pane.id = tabId;
+                pane.role = 'tabpanel';
+                pane.innerHTML = `
                     <div class="mb-4">
                         <h6 class="fw-bold">Low Outdoor Temperature Point</h6>
                         <div class="row align-items-center">
-                            <label class="col-sm-6 col-form-label text-sm-end">Outdoor Temp</label>
-                            <div class="col-sm-6">
+                            <label class="col-sm-7 col-form-label text-sm-end">Outdoor Temp</label>
+                            <div class="col-sm-5">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input x1" value="${data.x1}" step="1">
+                                    <input type="number" class="form-control narrow-input x1" value="${curve.x1}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
                         </div>
                         <div class="row align-items-center">
-                            <label class="col-sm-6 col-form-label text-sm-end">Leaving Water Temp</label>
-                            <div class="col-sm-6">
+                            <label class="col-sm-7 col-form-label text-sm-end">Leaving Water Temp</label>
+                            <div class="col-sm-5">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input y1" value="${data.y1}" step="1">
+                                    <input type="number" class="form-control narrow-input y1" value="${curve.y1}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <h6 class="fw-bold">High Outdoor Temperature Point</h6>
                         <div class="row align-items-center">
-                            <label class="col-sm-6 col-form-label text-sm-end">Outdoor Temp</label>
-                            <div class="col-sm-6">
+                            <label class="col-sm-7 col-form-label text-sm-end">Outdoor Temp</label>
+                            <div class="col-sm-5">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input x2" value="${data.x2}" step="1">
+                                    <input type="number" class="form-control narrow-input x2" value="${curve.x2}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
                         </div>
                         <div class="row align-items-center">
-                            <label class="col-sm-6 col-form-label text-sm-end">Leaving Water Temp</label>
-                            <div class="col-sm-6">
+                            <label class="col-sm-7 col-form-label text-sm-end">Leaving Water Temp</label>
+                            <div class="col-sm-5">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input y2" value="${data.y2}" step="1">
+                                    <input type="number" class="form-control narrow-input y2" value="${curve.y2}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button class="btn btn-danger remove">Remove Curve</button>
-                </div>
-            `;
-            container.appendChild(div);
-            const wrapper = div.querySelector('.curve-title-wrapper');
-            const titleSpan = div.querySelector('.curve-title');
-            makeTitleEditable(wrapper, titleSpan, index);
-            div.querySelectorAll('input[type="number"]').forEach(input => input.addEventListener('change', updateAll));
-            const removeBtn = div.querySelector('.remove');
-            if (removeBtn) removeBtn.addEventListener('click', () => { div.remove(); updateAll(); });
-            curves.push({ x1: data.x1, y1: data.y1, x2: data.x2, y2: data.y2, name });
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary rename" data-index="${i}">Rename curve</button>
+                        <button class="btn btn-danger remove" data-index="${i}">Remove Curve</button>
+                    </div>`;
+                tabContent.appendChild(pane);
+            });
+
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                input.removeEventListener('change', updateAll);
+                input.addEventListener('change', updateAll);
+            });
+            document.querySelectorAll('.rename').forEach(btn => {
+                btn.addEventListener('click', () => openRenameModal(parseInt(btn.dataset.index)));
+            });
+            document.querySelectorAll('.remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    curves.splice(parseInt(btn.dataset.index), 1);
+                    updateTabsAndContent();
+                    updateAll();
+                });
+            });
+
+            updateRemoveButtons();
+        }
+
+        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null}) {
+            const defaultName = `Curve ${curves.length + 1}`;
+            curves.push({
+                x1: data.x1,
+                y1: data.y1,
+                x2: data.x2,
+                y2: data.y2,
+                name: data.name || defaultName
+            });
+            updateTabsAndContent();
             updateAll();
+
+            const newTabBtn = document.querySelector(`#curve-tab-${curves.length - 1}-tab`);
+            if (newTabBtn) {
+                const bsTab = new bootstrap.Tab(newTabBtn);
+                bsTab.show();
+            }
         }
 
         function updateAll() {
-            const divs = document.querySelectorAll('#curves-container > .card');
-            curves = [];
-            divs.forEach((div, i) => {
-                const x1 = parseFloat(div.querySelector('.x1').value);
-                const y1 = parseFloat(div.querySelector('.y1').value);
-                const x2 = parseFloat(div.querySelector('.x2').value);
-                const y2 = parseFloat(div.querySelector('.y2').value);
-                let name = div.querySelector('.curve-title').textContent.trim() || `Curve ${i + 1}`;
-                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                    curves.push({x1, y1, x2, y2, name});
-                }
-            });
-            updateRemoveButtons();
+            const activePane = document.querySelector('.tab-pane.active');
+            if (!activePane) return;
+
+            const inputs = activePane.querySelectorAll('input[type="number"]');
+            const index = Array.from(document.querySelectorAll('.tab-pane')).indexOf(activePane);
+
+            if (index >= 0 && index < curves.length) {
+                curves[index].x1 = parseFloat(inputs[0].value) || curves[index].x1;
+                curves[index].y1 = parseFloat(inputs[1].value) || curves[index].y1;
+                curves[index].x2 = parseFloat(inputs[2].value) || curves[index].x2;
+                curves[index].y2 = parseFloat(inputs[3].value) || curves[index].y2;
+            }
+
             updateChart();
             updateURL();
             calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
@@ -265,25 +313,18 @@
         function updateChart() {
             if (chart) chart.destroy();
             const ctx = document.getElementById('chart').getContext('2d');
-
             let allX1 = [], allX2 = [], allY = [];
             curves.forEach(c => {
                 allX1.push(c.x1);
                 allX2.push(c.x2);
                 allY.push(c.y1, c.y2);
             });
-
-            // X-axis
             let minLeft = allX1.length > 0 ? Math.min(...allX1) : DEFAULT_MIN_X;
             let displayMinX = minLeft - ((minLeft+100) % 5) - LEFT_PADDING;
-
             let maxRight = allX2.length > 0 ? Math.max(...allX2) : DEFAULT_MAX_X;
             let displayMaxX = ceilTo5(maxRight + RIGHT_PADDING);
-
-            // Y-axis: correct ceiling/flooring after padding
             let rawMinY = allY.length > 0 ? Math.min(...allY) : DEFAULT_MIN_Y;
             let rawMaxY = allY.length > 0 ? Math.max(...allY) : DEFAULT_MAX_Y;
-
             let displayMinY = floorTo5(rawMinY - EXTEND_PADDING_Y);
             let displayMaxY = ceilTo5(rawMaxY + EXTEND_PADDING_Y);
 
@@ -296,7 +337,6 @@
                 for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) data.push({x: t, y: getLWTForCurve(c, t)});
                 data.push({x: right.x, y: right.y});
                 for (let t = Math.ceil(right.x); t <= displayMaxX; t++) data.push({x: t, y: right.y});
-
                 return {
                     label: c.name,
                     data,
@@ -318,19 +358,9 @@
                     borderColor: 'rgba(80, 80, 80, 0.9)',
                     borderWidth: 1.5,
                     borderDash: [6, 4],
-                    label: {
-                        display: false,
-                        content: '',
-                        position: 'end',
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        color: '#fff',
-                        font: { size: 12, weight: 'bold' },
-                        padding: 6,
-                        borderRadius: 4
-                    }
+                    label: { display: false, content: '', position: 'end', backgroundColor: 'rgba(0,0,0,0.8)', color: '#fff', font: { size: 12, weight: 'bold' }, padding: 6, borderRadius: 4 }
                 }
             };
-
             curves.forEach((curve, i) => {
                 const color = `hsl(${i * 137 % 360}, 70%, 50%)`;
                 baseAnnotations[`hLine${i}`] = {
@@ -340,16 +370,7 @@
                     borderColor: color,
                     borderWidth: 1.5,
                     borderDash: [6, 4],
-                    label: {
-                        display: false,
-                        content: '',
-                        position: 'start',
-                        backgroundColor: color,
-                        color: '#fff',
-                        font: { size: 11, weight: 'bold' },
-                        padding: 5,
-                        borderRadius: 4
-                    }
+                    label: { display: false, content: '', position: 'start', backgroundColor: color, color: '#fff', font: { size: 11, weight: 'bold' }, padding: 5, borderRadius: 4 }
                 };
             });
 
@@ -381,10 +402,8 @@
                     onHover: (event, activeElements) => {
                         const chartArea = chart.chartArea;
                         if (!event.native || !chartArea) return;
-
                         const x = event.x;
                         const y = event.y;
-
                         if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) {
                             chart.options.plugins.annotation.annotations.vLine.value = null;
                             chart.options.plugins.annotation.annotations.vLine.label.display = false;
@@ -395,19 +414,15 @@
                             chart.update('none');
                             return;
                         }
-
                         const xValue = chart.scales.x.getValueForPixel(x);
                         const snappedX = Math.round(xValue);
-
                         chart.options.plugins.annotation.annotations.vLine.value = snappedX;
                         chart.options.plugins.annotation.annotations.vLine.label.content = `Outdoor temperature: ${snappedX}°C`;
                         chart.options.plugins.annotation.annotations.vLine.label.display = true;
-
                         curves.forEach((curve, i) => {
                             const lwt = getLWTForCurve(curve, snappedX);
                             const roundedY = Math.round(lwt * 10) / 10;
                             const color = `hsl(${i * 137 % 360}, 70%, 50%)`;
-
                             const hLine = chart.options.plugins.annotation.annotations[`hLine${i}`];
                             hLine.value = roundedY;
                             hLine.borderColor = color;
@@ -415,7 +430,6 @@
                             hLine.label.backgroundColor = color;
                             hLine.label.display = true;
                         });
-
                         chart.update('none');
                     }
                 },
@@ -467,7 +481,6 @@
             const params = new URLSearchParams(search);
             const curveKeys = [...params.keys()].filter(k => k.startsWith('curve')).map(k => parseInt(k.match(/curve(\d+)/)[1])).sort((a,b) => a-b);
             if (curveKeys.length === 0) { addCurve(); return; }
-
             const maxIndex = Math.max(...curveKeys);
             for (let i = 1; i <= maxIndex; i++) {
                 const curveParam = params.get(`curve${i}`);
@@ -500,25 +513,39 @@
             });
         }
 
-        window.addEventListener('load', () => {
+        document.addEventListener('DOMContentLoaded', () => {
+            renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
+            renameInput = document.getElementById('renameInput');
+            renameSave = document.getElementById('renameSave');
+
+            // Save on button click
+            renameSave.addEventListener('click', saveRename);
+
+            // Save on Enter key in input field
+            renameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveRename();
+                }
+            });
+
             loadFromURL();
             document.getElementById('copy-clipboard').addEventListener('click', copyToClipboard);
-        });
-
-        document.getElementById('add-curve').addEventListener('click', () => {
-            if (curves.length === 0) addCurve();
-            else {
-                const last = curves[curves.length - 1];
-                addCurve({ x1: last.x1, y1: last.y1 - 5, x2: last.x2, y2: last.y2, name: null });
-            }
-        });
-
-        document.getElementById('oat-input').addEventListener('input', e => {
-            const oat = parseFloat(e.target.value);
-            calculateLWT(oat);
-            updateURL();
+            document.getElementById('add-curve').addEventListener('click', () => {
+                if (curves.length === 0) addCurve();
+                else {
+                    const last = curves[curves.length - 1];
+                    addCurve({ x1: last.x1, y1: last.y1 - 5, x2: last.x2, y2: last.y2, name: null });
+                }
+            });
+            document.getElementById('oat-input').addEventListener('input', e => {
+                const oat = parseFloat(e.target.value);
+                calculateLWT(oat);
+                updateURL();
+            });
         });
     </script>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
 </html>
