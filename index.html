@@ -116,7 +116,7 @@
                             <label class="col-sm-6 col-form-label text-sm-end">Outdoor Temp</label>
                             <div class="col-sm-6">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input x1" value="${data.x1}" step="0.1">
+                                    <input type="number" class="form-control narrow-input x1" value="${data.x1}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -125,7 +125,7 @@
                             <label class="col-sm-6 col-form-label text-sm-end">Leaving Water Temp</label>
                             <div class="col-sm-6">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input y1" value="${data.y1}" step="0.1">
+                                    <input type="number" class="form-control narrow-input y1" value="${data.y1}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -138,7 +138,7 @@
                             <label class="col-sm-6 col-form-label text-sm-end">Outdoor Temp</label>
                             <div class="col-sm-6">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input x2" value="${data.x2}" step="0.1">
+                                    <input type="number" class="form-control narrow-input x2" value="${data.x2}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -147,7 +147,7 @@
                             <label class="col-sm-6 col-form-label text-sm-end">Leaving Water Temp</label>
                             <div class="col-sm-6">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input y2" value="${data.y2}" step="0.1">
+                                    <input type="number" class="form-control narrow-input y2" value="${data.y2}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -301,6 +301,7 @@
                             bodySpacing: 6,
                             titleFont: { size: 15, weight: 'bold' },
                             bodyFont: { size: 14 },
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
                             callbacks: {
                                 title: function(tooltipItems) {
                                     if (tooltipItems.length === 0) return '';
@@ -411,7 +412,7 @@
             curves.forEach((c, i) => {
                 const lwt = getLWTForCurve(c, oat);
                 const p = document.createElement('p');
-                p.textContent = `Curve ${i + 1}: LWT = ${lwt.toFixed(2)} °C`;
+                p.textContent = `Curve ${i + 1}: LWT = ${lwt.toFixed(1)} °C`;
                 results.appendChild(p);
             });
         }
