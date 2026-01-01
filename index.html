@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         body { padding: 20px; }
-        #chart { max-height: 600px; }
+        #chart { max-height: 600px; cursor: crosshair; }
         .header-container { position: relative; }
         .by-line {
             position: absolute;
@@ -224,7 +224,6 @@
                 maxX = Math.max(maxX, actualMax + EXTEND_PADDING);
             }
 
-            // Round minX down and maxX up to nearest integer for clean steps
             const displayMinX = Math.floor(minX);
             const displayMaxX = Math.ceil(maxX);
 
@@ -235,15 +234,12 @@
 
                 const data = [];
 
-                // Left horizontal section: integer points from displayMinX to floor(leftPoint.x)
                 for (let temp = displayMinX; temp <= Math.floor(leftPoint.x); temp++) {
                     data.push({x: temp, y: leftPoint.y});
                 }
 
-                // Main left point (already included above if integer, but ensure it's there)
                 data.push({x: leftPoint.x, y: leftPoint.y});
 
-                // Sloped section: integer points strictly between left and right
                 const slopeStart = Math.ceil(leftPoint.x);
                 const slopeEnd = Math.floor(rightPoint.x);
                 for (let temp = slopeStart; temp < slopeEnd; temp++) {
@@ -251,10 +247,8 @@
                     data.push({x: temp, y: y});
                 }
 
-                // Main right point
                 data.push({x: rightPoint.x, y: rightPoint.y});
 
-                // Right horizontal section: integer points from ceil(rightPoint.x) to displayMaxX
                 for (let temp = Math.ceil(rightPoint.x); temp <= displayMaxX; temp++) {
                     data.push({x: temp, y: rightPoint.y});
                 }
@@ -268,11 +262,9 @@
                     tension: 0,
                     pointRadius: function(context) {
                         const value = context.parsed.x;
-                        // Main points (user-entered): larger
                         if (value === leftPoint.x || value === rightPoint.x) {
                             return 5;
                         }
-                        // All intermediate/horizontal points: invisible normally
                         return 0;
                     },
                     pointHoverRadius: function(context) {
@@ -280,11 +272,9 @@
                         if (value === leftPoint.x || value === rightPoint.x) {
                             return 8;
                         }
-                        // Show a small dot when hovered
                         return 4;
                     },
-                    pointBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
-                    pointHoverBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`
+                    pointBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`
                 };
             });
 
@@ -300,9 +290,15 @@
                         tooltip: {
                             mode: 'index',
                             intersect: false,
+                            position: 'nearest',
+                            caretPadding: 20,
+                            padding: 12,
+                            titleMarginBottom: 10,
+                            bodySpacing: 6,
+                            titleFont: { size: 15, weight: 'bold' },
+                            bodyFont: { size: 14 },
                             callbacks: {
                                 title: function(tooltipItems) {
-                                    if (tooltipItems.length === 0) return '';
                                     const rawX = tooltipItems[0].parsed.x;
                                     const roundedX = Math.round(rawX);
                                     return `Outdoor Temp: ${roundedX} °C`;
@@ -332,7 +328,41 @@
                             max: DEFAULT_MAX_Y,
                             ticks: { stepSize: 5 }
                         }
-                    }
+                    },
+                    plugins: [{
+                        id: 'crosshair',
+                        afterDatasetsDraw: function(chartInstance) {
+                            const tooltip = chartInstance.tooltip;
+                            if (tooltip.opacity === 0) return;
+
+                            const activeElements = tooltip.dataPoints;
+                            if (!activeElements || activeElements.length === 0) return;
+
+                            const ctx = chartInstance.ctx;
+                            const x = activeElements[0].element.x;
+                            const y = activeElements[0].element.y;
+                            const chartArea = chartInstance.chartArea;
+
+                            ctx.save();
+                            ctx.setLineDash([6, 4]);
+                            ctx.lineWidth = 1.5;
+                            ctx.strokeStyle = 'rgba(80, 80, 80, 0.8)';
+
+                            // Vertical line
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartArea.top);
+                            ctx.lineTo(x, chartArea.bottom);
+                            ctx.stroke();
+
+                            // Horizontal line (left to point)
+                            ctx.beginPath();
+                            ctx.moveTo(chartArea.left, y);
+                            ctx.lineTo(x, y);
+                            ctx.stroke();
+
+                            ctx.restore();
+                        }
+                    }]
                 }
             });
         }
