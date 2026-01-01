@@ -85,13 +85,13 @@
                 <!-- Share box -->
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Share this curve</h5>
-                        <div class="share-buttons">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <h5 class="card-title mb-0">Share this curve</h5>
                             <button id="copy-clipboard" class="btn btn-secondary">
                                 <i class="fas fa-copy"></i> Copy Link
                             </button>
                         </div>
-                        <small id="copy-feedback" class="text-success d-none">Link copied to clipboard!</small>
+                        <small id="copy-feedback" class="text-success d-none mt-3 d-block">Link copied to clipboard!</small>
                     </div>
                 </div>
             </div>
@@ -193,7 +193,6 @@
             });
             updateChart();
             updateURL();
-            updateShareLinks();
         }
 
         function getLWTForCurve(curve, oat) {
@@ -238,7 +237,6 @@
             }
             const displayMinY = Math.floor(minY);
             const displayMaxY = Math.ceil(maxY);
-
 
             const datasets = curves.map((c, i) => {
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
@@ -312,10 +310,10 @@
                             bodyFont: { size: 14 },
                             callbacks: {
                                 title: function(tooltipItems) {
+                                    if (tooltipItems.length === 0) return '';
                                     const rawX = tooltipItems[0].parsed.x;
                                     const roundedX = Math.round(rawX);
-                                    return "Test me";
-                                    //return `Outdoor Temp: ${roundedX} °C`;
+                                    return `Outdoor Temp: ${roundedX} °C`;
                                 },
                                 label: function(context) {
                                     const curveIndex = context.datasetIndex;
@@ -347,34 +345,34 @@
                         id: 'crosshair',
                         afterDatasetsDraw: function(chartInstance) {
                             const tooltip = chartInstance.tooltip;
-                            if (tooltip.opacity === 0) return;
+                            if (tooltip && tooltip.opacity > 0) {
+                                const activeElements = tooltip.dataPoints;
+                                if (activeElements && activeElements.length > 0) {
+                                    const ctx = chartInstance.ctx;
+                                    const x = activeElements[0].element.x;
+                                    const y = activeElements[0].element.y;
+                                    const chartArea = chartInstance.chartArea;
 
-                            const activeElements = tooltip.dataPoints;
-                            if (!activeElements || activeElements.length === 0) return;
+                                    ctx.save();
+                                    ctx.setLineDash([6, 4]);
+                                    ctx.lineWidth = 1.5;
+                                    ctx.strokeStyle = 'rgba(80, 80, 80, 0.8)';
 
-                            const ctx = chartInstance.ctx;
-                            const x = activeElements[0].element.x;
-                            const y = activeElements[0].element.y;
-                            const chartArea = chartInstance.chartArea;
+                                    // Vertical line
+                                    ctx.beginPath();
+                                    ctx.moveTo(x, chartArea.top);
+                                    ctx.lineTo(x, chartArea.bottom);
+                                    ctx.stroke();
 
-                            ctx.save();
-                            ctx.setLineDash([6, 4]);
-                            ctx.lineWidth = 1.5;
-                            ctx.strokeStyle = 'rgba(80, 80, 80, 0.8)';
+                                    // Horizontal line (left to point)
+                                    ctx.beginPath();
+                                    ctx.moveTo(chartArea.left, y);
+                                    ctx.lineTo(x, y);
+                                    ctx.stroke();
 
-                            // Vertical line
-                            ctx.beginPath();
-                            ctx.moveTo(x, chartArea.top);
-                            ctx.lineTo(x, chartArea.bottom);
-                            ctx.stroke();
-
-                            // Horizontal line (left to point)
-                            ctx.beginPath();
-                            ctx.moveTo(chartArea.left, y);
-                            ctx.lineTo(x, y);
-                            ctx.stroke();
-
-                            ctx.restore();
+                                    ctx.restore();
+                                }
+                            }
                         }
                     }]
                 }
@@ -402,15 +400,6 @@
             const newUrl = newQuery ? `${base}?${newQuery}` : base;
 
             history.replaceState(null, '', newUrl);
-        }
-
-        function updateShareLinks() {
-            const url = encodeURIComponent(window.location.href);
-            const title = encodeURIComponent(document.title);
-            document.getElementById('share-facebook').href = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
-            document.getElementById('share-x').href = `https://twitter.com/intent/tweet?url=${url}&text=${title}`;
-            document.getElementById('share-whatsapp').href = `https://wa.me/?text=${title}%20${url}`;
-            document.getElementById('share-email').href = `mailto:?subject=${title}&body=Check out this heating curve:%20${url}`;
         }
 
         async function copyToClipboard() {
@@ -470,7 +459,6 @@
 
         window.addEventListener('load', () => {
             loadFromURL();
-            updateShareLinks();
             document.getElementById('copy-clipboard').addEventListener('click', copyToClipboard);
         });
 
