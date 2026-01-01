@@ -13,9 +13,8 @@
         .header-container { position: relative; }
         .by-line {
             position: absolute;
-            top: 0;
+            bottom: 0;
             right: 0;
-            font-size: 0.8rem;
             color: #6c757d;
         }
         @media (max-width: 576px) {
@@ -29,7 +28,7 @@
             margin-bottom: 0.5rem;
         }
         .narrow-input {
-            max-width: 100px;
+            max-width: 10ch;
         }
         .lwt-input-group {
             min-width: 320px;
@@ -51,13 +50,13 @@
                 By <a href="https://github.com/luksa" target="_blank">Marko Lukša</a>
             </div>
         </div>
-        <p class="mb-4">Enter points for each curve. The graph shows horizontal lines extending left and right from the points, with a sloped line in between. Share the page URL to preserve the curves.</p>
+        <p class="mb-4">Enter the two points for the curve.</p>
         
         <div class="row">
             <!-- Left column: curve inputs only -->
             <div class="col-md-4 order-md-1 order-2">
                 <div id="curves-container" class="mb-4"></div>
-                <button id="add-curve" class="btn btn-primary mb-4">Add another curve</button>
+                <button id="add-curve" class="btn btn-primary mb-4">Add Another Curve</button>
             </div>
             
             <!-- Right column: graph + LWT calculator + share -->
@@ -72,7 +71,7 @@
                             <div class="col">
                                 <div class="input-group lwt-input-group">
                                     <span class="input-group-text">Outdoor Temp</span>
-                                    <input id="oat-input" type="number" step="0.1" class="form-control" placeholder="e.g. 5">
+                                    <input id="oat-input" type="number" step="1" class="form-control narrow-input" placeholder="e.g. 5">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -91,18 +90,6 @@
                             <button id="copy-clipboard" class="btn btn-secondary">
                                 <i class="fas fa-copy"></i> Copy Link
                             </button>
-                            <a id="share-facebook" class="btn btn-primary" target="_blank">
-                                <i class="fab fa-facebook-f"></i> Facebook
-                            </a>
-                            <a id="share-x" class="btn btn-dark" target="_blank">
-                                <i class="fab fa-x-twitter"></i> X (Twitter)
-                            </a>
-                            <a id="share-whatsapp" class="btn btn-success" target="_blank">
-                                <i class="fab fa-whatsapp"></i> WhatsApp
-                            </a>
-                            <a id="share-email" class="btn btn-info" target="_blank">
-                                <i class="fas fa-envelope"></i> Email
-                            </a>
                         </div>
                         <small id="copy-feedback" class="text-success d-none">Link copied to clipboard!</small>
                     </div>
@@ -115,13 +102,14 @@
         let curves = [];
         let chart;
         const DEFAULT_MIN_X = -10;
-        const DEFAULT_MAX_X = 30;
+        const DEFAULT_MAX_X = 25;
         const DEFAULT_MIN_Y = 20;
-        const DEFAULT_MAX_Y = 60;
-        const EXTEND_PADDING = 10;
+        const DEFAULT_MAX_Y = 40;
+        const EXTEND_PADDING_X = 5;
+        const EXTEND_PADDING_Y = 5;
         const SEPARATOR = ',';
 
-        function addCurve(data = {x1: -10, y1: 55, x2: 15, y2: 25}) {
+        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25}) {
             const container = document.getElementById('curves-container');
             const div = document.createElement('div');
             div.className = 'card mb-3';
@@ -223,22 +211,34 @@
             const ctx = document.getElementById('chart').getContext('2d');
 
             let allX = [];
+            let allY = [];
             curves.forEach(c => {
                 allX.push(c.x1, c.x2);
+                allY.push(c.y1, c.y2);
             });
 
             let minX = DEFAULT_MIN_X;
             let maxX = DEFAULT_MAX_X;
-
             if (allX.length > 0) {
                 const actualMin = Math.min(...allX);
                 const actualMax = Math.max(...allX);
-                minX = Math.min(minX, actualMin - EXTEND_PADDING);
-                maxX = Math.max(maxX, actualMax + EXTEND_PADDING);
+                minX = Math.min(minX, actualMin - EXTEND_PADDING_X);
+                maxX = Math.max(maxX, actualMax + EXTEND_PADDING_X);
             }
-
             const displayMinX = Math.floor(minX);
             const displayMaxX = Math.ceil(maxX);
+
+            let minY = DEFAULT_MIN_Y;
+            let maxY = DEFAULT_MAX_Y;
+            if (allY.length > 0) {
+                const actualMin = Math.min(...allY);
+                const actualMax = Math.max(...allY);
+                minY = Math.min(minY, actualMin - EXTEND_PADDING_Y);
+                maxY = Math.max(maxY, actualMax + EXTEND_PADDING_Y);
+            }
+            const displayMinY = Math.floor(minY);
+            const displayMaxY = Math.ceil(maxY);
+
 
             const datasets = curves.map((c, i) => {
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
@@ -314,7 +314,8 @@
                                 title: function(tooltipItems) {
                                     const rawX = tooltipItems[0].parsed.x;
                                     const roundedX = Math.round(rawX);
-                                    return `Outdoor Temp: ${roundedX} °C`;
+                                    return "Test me";
+                                    //return `Outdoor Temp: ${roundedX} °C`;
                                 },
                                 label: function(context) {
                                     const curveIndex = context.datasetIndex;
@@ -337,8 +338,8 @@
                         },
                         y: {
                             title: { display: true, text: 'Leaving Water Temperature (°C)' },
-                            min: DEFAULT_MIN_Y,
-                            max: DEFAULT_MAX_Y,
+                            min: displayMinY,
+                            max: displayMaxY,
                             ticks: { stepSize: 5 }
                         }
                     },
