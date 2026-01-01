@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dependent Heating Curve Visualizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        #curves-container > div { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        #chart { max-width: 800px; height: 600px; }
+        label { display: block; margin-bottom: 5px; }
+        button { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Weather Dependent Heating Curve Visualizer</h1>
+    <p>Enter points for each curve.</p>
+    
+    <div id="curves-container"></div>
+    <button id="add-curve">Add Curve</button>
+    
+    <canvas id="chart"></canvas>
+    
+    <div>
+        <h2>Calculate LWT for a Given Outdoor Temperature</h2>
+        <label>Outdoor Temperature (°C): <input id="oat-input" type="number" step="0.1"></label>
+        <div id="lwt-results"></div>
+    </div>
+    
+    <script>
+        let curves = [];
+        let chart;
+
+        function addCurve(data = {x1: -10, y1: 55, x2: 15, y2: 25}) {
+            const container = document.getElementById('curves-container');
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <h3>Curve</h3>
+                <label>X1 (Low OAT °C): <input type="number" class="x1" value="${data.x1}" step="0.1"></label>
+                <label>Y1 (High LWT °C): <input type="number" class="y1" value="${data.y1}" step="0.1"></label>
+                <label>X2 (High OAT °C): <input type="number" class="x2" value="${data.x2}" step="0.1"></label>
+                <label>Y2 (Low LWT °C): <input type="number" class="y2" value="${data.y2}" step="0.1"></label>
+                <button class="remove">Remove Curve</button>
+            `;
+            container.appendChild(div);
+
+            div.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', updateAll);
+            });
+
+            div.querySelector('.remove').addEventListener('click', () => {
+                div.remove();
+                updateAll();
+            });
+
+            updateAll();
+        }
+
+        function updateAll() {
+            const divs = document.querySelectorAll('#curves-container > div');
+            curves = [];
+            divs.forEach((div, i) => {
+                const x1 = parseFloat(div.querySelector('.x1').value);
+                const y1 = parseFloat(div.querySelector('.y1').value);
+                const x2 = parseFloat(div.querySelector('.x2').value);
+                const y2 = parseFloat(div.querySelector('.y2').value);
+                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                    curves.push({x1, y1, x2, y2});
+                }
+                div.querySelector('h3').textContent = `Curve ${i + 1}`;
+            });
+            updateChart();
+            updateURL();
+            const oat = parseFloat(document.getElementById('oat-input').value);
+            if (!isNaN(oat)) {
+                calculateLWT(oat);
+            }
+        }
+
+        function updateChart() {
+            if (chart) chart.destroy();
+            const ctx = document.getElementById('chart').getContext('2d');
+            const datasets = curves.map((c, i) => {
+                let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
+                const leftPoint = points[0];
+                const rightPoint = points[1];
+                const data = [
+                    {x: leftPoint.x - 10, y: leftPoint.y},
+                    {x: leftPoint.x, y: leftPoint.y},
+                    {x: rightPoint.x, y: rightPoint.y},
+                    {x: rightPoint.x + 10, y: rightPoint.y}
+                ];
+                return {
+                    label: `Curve ${i + 1}`,
+                    data: data,
+                    borderColor: `hsl(${i * 137 % 360}, 50%, 50%)`,
+                    fill: false,
+                    tension: 0
+                };
+            });
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'Outdoor Temperature (°C)' },
+                            suggestedMin: -10,
+                            suggestedMax: 30
+                        },
+                        y: {
+                            title: { display: true, text: 'Leaving Water Temperature - LWT (°C)' },
+                            suggestedMin: 20,
+                            suggestedMax: 60
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateURL() {
+            const params = new URLSearchParams();
+            if (curves.length > 0) {
+                params.set('curves', JSON.stringify(curves));
+            }
+            history.replaceState(null, '', params.toString() ? `?${params.toString()}` : location.pathname);
+        }
+
+        function calculateLWT(oat) {
+            const results = document.getElementById('lwt-results');
+            results.innerHTML = '';
+            curves.forEach((c, i) => {
+                let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
+                const left = points[0];
+                const right = points[1];
+                let lwt;
+                if (oat < left.x) {
+                    lwt = left.y;
+                } else if (oat > right.x) {
+                    lwt = right.y;
+                } else {
+                    const slope = (right.y - left.y) / (right.x - left.x);
+                    lwt = left.y + slope * (oat - left.x);
+                }
+                const p = document.createElement('p');
+                p.textContent = `Curve ${i + 1}: LWT = ${lwt.toFixed(2)} °C`;
+                results.appendChild(p);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const savedCurves = params.get('curves');
+            if (savedCurves) {
+                try {
+                    const parsed = JSON.parse(savedCurves);
+                    parsed.forEach(addCurve);
+                } catch (e) {
+                    addCurve();
+                }
+            } else {
+                addCurve();
+            }
+        });
+
+        document.getElementById('add-curve').addEventListener('click', () => addCurve());
+
+        document.getElementById('oat-input').addEventListener('input', (e) => {
+            const oat = parseFloat(e.target.value);
+            if (!isNaN(oat)) {
+                calculateLWT(oat);
+            }
+        });
+    </script>
+</body>
+</html>
