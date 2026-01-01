@@ -33,6 +33,22 @@
         .lwt-row {
             align-items: flex-start;
         }
+        .curve-title {
+            cursor: pointer;
+            display: inline-block;
+            min-width: 60px;
+        }
+        .curve-title-input {
+            display: inline-block;
+            width: auto;
+            min-width: 100px;
+        }
+        footer {
+            margin-top: 4rem;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
@@ -44,18 +60,18 @@
             </div>
         </div>
         <p class="mb-4">Enter the two points for the curve.</p>
-        
+       
         <div class="row">
             <!-- Left column: curve inputs only -->
             <div class="col-md-4 order-md-1 order-2">
                 <div id="curves-container" class="mb-4"></div>
                 <button id="add-curve" class="btn btn-primary mb-4">Add Another Curve</button>
             </div>
-            
+           
             <!-- Right column: graph + LWT calculator + share -->
             <div class="col-md-8 order-md-2 order-1">
                 <canvas id="chart" class="mb-4"></canvas>
-                
+               
                 <!-- LWT Calculator – full width under the graph -->
                 <div class="card mb-4">
                     <div class="card-body">
@@ -74,7 +90,7 @@
                         </div>
                     </div>
                 </div>
-                
+               
                 <!-- Share box -->
                 <div class="card">
                     <div class="card-body">
@@ -90,9 +106,13 @@
             </div>
         </div>
     </div>
-    
+
+    <footer>
+        Inspired by <a href="https://vscope.at/heizkurve" target="_blank">vscope.at/heizkurve</a>
+    </footer>
+   
     <script>
-        let curves = [];
+        let curves = []; // now holds {x1, y1, x2, y2, name}
         let chart;
         const DEFAULT_MIN_X = -10;
         const DEFAULT_MAX_X = 25;
@@ -102,14 +122,55 @@
         const EXTEND_PADDING_Y = 5;
         const SEPARATOR = ',';
 
-        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25}) {
+        function makeTitleEditable(titleSpan, index) {
+            titleSpan.addEventListener('click', () => {
+                const currentText = titleSpan.textContent;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentText;
+                input.className = 'form-control curve-title-input d-inline-block';
+
+                titleSpan.style.display = 'none';
+                titleSpan.parentNode.insertBefore(input, titleSpan.nextSibling);
+                input.focus();
+                input.select();
+
+                const finishEditing = () => {
+                    const newName = input.value.trim() || `Curve ${index + 1}`;
+                    curves[index].name = newName;
+                    titleSpan.textContent = newName;
+                    input.remove();
+                    titleSpan.style.display = 'inline-block';
+                    updateChart();
+                    updateURL();
+                };
+
+                input.addEventListener('blur', finishEditing);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        finishEditing();
+                    } else if (e.key === 'Escape') {
+                        input.remove();
+                        titleSpan.style.display = 'inline-block';
+                    }
+                });
+            });
+        }
+
+        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null}) {
             const container = document.getElementById('curves-container');
             const div = document.createElement('div');
             div.className = 'card mb-3';
+            const index = container.children.length; // before appending
+            const defaultName = `Curve ${index + 1}`;
+            const name = data.name || defaultName;
+
             div.innerHTML = `
                 <div class="card-body">
-                    <h5 class="card-title">Curve</h5>
-                    
+                    <h5 class="card-title">
+                        <span class="curve-title">${name}</span>
+                    </h5>
+                   
                     <div class="mb-4">
                         <h6 class="fw-bold">Low Outdoor Temperature Point</h6>
                         <div class="row align-items-center">
@@ -131,7 +192,7 @@
                             </div>
                         </div>
                     </div>
-                    
+                   
                     <div class="mb-3">
                         <h6 class="fw-bold">High Outdoor Temperature Point</h6>
                         <div class="row align-items-center">
@@ -153,19 +214,30 @@
                             </div>
                         </div>
                     </div>
-                    
+                   
                     <button class="btn btn-danger remove">Remove Curve</button>
                 </div>
             `;
             container.appendChild(div);
 
-            div.querySelectorAll('input').forEach(input => {
+            const titleSpan = div.querySelector('.curve-title');
+            makeTitleEditable(titleSpan, index);
+
+            div.querySelectorAll('input[type="number"]').forEach(input => {
                 input.addEventListener('change', updateAll);
             });
-
             div.querySelector('.remove').addEventListener('click', () => {
                 div.remove();
                 updateAll();
+            });
+
+            // store curve data
+            curves.push({
+                x1: data.x1,
+                y1: data.y1,
+                x2: data.x2,
+                y2: data.y2,
+                name: name
             });
 
             updateAll();
@@ -179,13 +251,16 @@
                 const y1 = parseFloat(div.querySelector('.y1').value);
                 const x2 = parseFloat(div.querySelector('.x2').value);
                 const y2 = parseFloat(div.querySelector('.y2').value);
+                let name = div.querySelector('.curve-title').textContent.trim();
+                if (!name || name === `Curve ${i + 1}`) name = `Curve ${i + 1}`;
+
                 if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                    curves.push({x1, y1, x2, y2});
+                    curves.push({x1, y1, x2, y2, name});
                 }
-                div.querySelector('.card-title').textContent = `Curve ${i + 1}`;
             });
             updateChart();
             updateURL();
+            calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
         }
 
         function getLWTForCurve(curve, oat) {
@@ -235,13 +310,11 @@
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
                 const leftPoint = points[0];
                 const rightPoint = points[1];
-
                 const data = [];
 
                 for (let temp = displayMinX; temp <= Math.floor(leftPoint.x); temp++) {
                     data.push({x: temp, y: leftPoint.y});
                 }
-
                 data.push({x: leftPoint.x, y: leftPoint.y});
 
                 const slopeStart = Math.ceil(leftPoint.x);
@@ -250,7 +323,6 @@
                     const y = getLWTForCurve(c, temp);
                     data.push({x: temp, y: y});
                 }
-
                 data.push({x: rightPoint.x, y: rightPoint.y});
 
                 for (let temp = Math.ceil(rightPoint.x); temp <= displayMaxX; temp++) {
@@ -258,7 +330,7 @@
                 }
 
                 return {
-                    label: `Curve ${i + 1}`,
+                    label: c.name,
                     data: data,
                     borderColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
                     backgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
@@ -266,16 +338,12 @@
                     tension: 0,
                     pointRadius: function(context) {
                         const value = context.parsed.x;
-                        if (value === leftPoint.x || value === rightPoint.x) {
-                            return 5;
-                        }
+                        if (value === leftPoint.x || value === rightPoint.x) return 5;
                         return 0;
                     },
                     pointHoverRadius: function(context) {
                         const value = context.parsed.x;
-                        if (value === leftPoint.x || value === rightPoint.x) {
-                            return 8;
-                        }
+                        if (value === leftPoint.x || value === rightPoint.x) return 8;
                         return 4;
                     },
                     pointBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`
@@ -314,7 +382,7 @@
                                     const curve = curves[curveIndex];
                                     const oat = Math.round(context.parsed.x);
                                     const lwt = getLWTForCurve(curve, oat);
-                                    return `Curve ${curveIndex + 1}: LWT ${lwt.toFixed(1)} °C`;
+                                    return `${curve.name}: LWT ${lwt.toFixed(1)} °C`;
                                 }
                             }
                         }
@@ -342,23 +410,19 @@
         function updateURL() {
             const base = window.location.pathname;
             const queryParts = [];
-
             curves.forEach((curve, i) => {
                 const value = `${curve.x1}${SEPARATOR}${curve.y1}${SEPARATOR}${curve.x2}${SEPARATOR}${curve.y2}`;
                 queryParts.push(`curve${i + 1}=${value}`);
+                queryParts.push(`name${i + 1}=${encodeURIComponent(curve.name)}`);
             });
-
             const oatInput = document.getElementById('oat-input');
             const oat = parseFloat(oatInput.value);
             if (!isNaN(oat)) {
                 queryParts.push(`oat=${oat}`);
             }
-
             queryParts.sort();
-
             const newQuery = queryParts.join('&');
             const newUrl = newQuery ? `${base}?${newQuery}` : base;
-
             history.replaceState(null, '', newUrl);
         }
 
@@ -380,19 +444,38 @@
                 return;
             }
             const params = new URLSearchParams(search);
-            const curveKeys = Array.from(params.keys()).filter(k => k.startsWith('curve')).sort();
-            curveKeys.forEach(key => {
-                const vals = params.get(key).split(SEPARATOR);
-                if (vals.length === 4) {
-                    const x1 = parseFloat(vals[0]);
-                    const y1 = parseFloat(vals[1]);
-                    const x2 = parseFloat(vals[2]);
-                    const y2 = parseFloat(vals[3]);
-                    if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                        addCurve({x1, y1, x2, y2});
+
+            // Find how many curves are defined
+            const curveKeys = Array.from(params.keys())
+                .filter(k => k.startsWith('curve'))
+                .map(k => parseInt(k.match(/curve(\d+)/)[1]))
+                .sort((a,b) => a-b);
+
+            if (curveKeys.length === 0) {
+                addCurve();
+                return;
+            }
+
+            const maxIndex = Math.max(...curveKeys);
+            for (let i = 1; i <= maxIndex; i++) {
+                const curveParam = params.get(`curve${i}`);
+                const nameParam = params.get(`name${i}`);
+                if (curveParam) {
+                    const vals = curveParam.split(SEPARATOR);
+                    if (vals.length === 4) {
+                        const x1 = parseFloat(vals[0]);
+                        const y1 = parseFloat(vals[1]);
+                        const x2 = parseFloat(vals[2]);
+                        const y2 = parseFloat(vals[3]);
+                        if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                            addCurve({
+                                x1, y1, x2, y2,
+                                name: nameParam ? decodeURIComponent(nameParam) : null
+                            });
+                        }
                     }
                 }
-            });
+            }
 
             if (params.has('oat')) {
                 const oat = parseFloat(params.get('oat'));
@@ -401,8 +484,6 @@
                     calculateLWT(oat);
                 }
             }
-
-            if (curveKeys.length === 0) addCurve();
         }
 
         function calculateLWT(oat) {
@@ -412,7 +493,7 @@
             curves.forEach((c, i) => {
                 const lwt = getLWTForCurve(c, oat);
                 const p = document.createElement('p');
-                p.textContent = `Curve ${i + 1}: LWT = ${lwt.toFixed(1)} °C`;
+                p.textContent = `${c.name}: LWT = ${lwt.toFixed(1)} °C`;
                 results.appendChild(p);
             });
         }
@@ -423,7 +504,6 @@
         });
 
         document.getElementById('add-curve').addEventListener('click', () => addCurve());
-
         document.getElementById('oat-input').addEventListener('input', (e) => {
             const oat = parseFloat(e.target.value);
             calculateLWT(oat);
