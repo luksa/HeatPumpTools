@@ -123,6 +123,7 @@
     <script>
         let curves = [];
         let chart;
+        let oat;
         const DEFAULT_MIN_X = -10;
         const DEFAULT_MAX_X = 25;
         const DEFAULT_MIN_Y = 20;
@@ -160,7 +161,7 @@
             updateTabsAndContent();
             updateChart();
             updateURL();
-            calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
+            calculateLWT();
             renameModal.hide();
         }
 
@@ -298,7 +299,8 @@
 
             updateChart();
             updateURL();
-            calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
+            calculateLWT();
+            displayDefaultCrosshair();
         }
 
         function getLWTForCurve(curve, oat) {
@@ -424,16 +426,13 @@
                     }
                 }]
             });
-            displayDefaultCrosshair();
         }
 
         function displayDefaultCrosshair() {
-            console.log("DisplayDefaultCrosshair: " + document.getElementById('oat-input').value);
-            displayCrosshair(parseFloat(document.getElementById('oat-input').value));
+            displayCrosshair(oat);
         }
 
         function displayCrosshair(oat) {
-            console.log("DisplayCrosshair " + oat);
             if (oat === NaN) {
                 chart.options.plugins.annotation.annotations.vLine.value = null;
                 chart.options.plugins.annotation.annotations.vLine.label.display = false;
@@ -469,7 +468,7 @@
                 queryParts.push(`curve${i + 1}=${curve.x1}${SEPARATOR}${curve.y1}${SEPARATOR}${curve.x2}${SEPARATOR}${curve.y2}`);
                 queryParts.push(`name${i + 1}=${encodeURIComponent(curve.name)}`);
             });
-            const oat = parseFloat(document.getElementById('oat-input').value);
+
             if (!isNaN(oat)) queryParts.push(`oat=${oat}`);
             queryParts.sort();
             const newQuery = queryParts.join('&');
@@ -490,7 +489,13 @@
         function loadFromURL() {
             const search = window.location.search.substring(1);
             if (!search) { addCurve(); return; }
+
             const params = new URLSearchParams(search);
+
+            if (params.has('oat')) {
+                oat = parseFloat(params.get('oat'));
+            }
+
             const curveKeys = [...params.keys()].filter(k => k.startsWith('curve')).map(k => parseInt(k.match(/curve(\d+)/)[1])).sort((a,b) => a-b);
             if (curveKeys.length === 0) { addCurve(); return; }
             const maxIndex = Math.max(...curveKeys);
@@ -504,17 +509,16 @@
                     }
                 }
             }
-            if (params.has('oat')) {
-                const oat = parseFloat(params.get('oat'));
-                if (!isNaN(oat)) {
-                    document.getElementById('oat-input').value = oat;
-                    calculateLWT(oat);
-                    displayCrosshair(oat);
-                }
+
+
+            if (!isNaN(oat)) {
+                document.getElementById('oat-input').value = oat;
+                calculateLWT();
+                displayDefaultCrosshair();
             }
         }
 
-        function calculateLWT(oat) {
+        function calculateLWT() {
             const results = document.getElementById('lwt-results');
             results.innerHTML = '';
             if (isNaN(oat)) return;
@@ -552,9 +556,9 @@
                 }
             });
             document.getElementById('oat-input').addEventListener('input', e => {
-                const oat = parseFloat(e.target.value);
-                calculateLWT(oat);
-                displayCrosshair(oat);
+                oat = parseFloat(e.target.value);
+                calculateLWT();
+                displayDefaultCrosshair();
                 updateURL();
             });
         });
