@@ -101,9 +101,22 @@
         const DEFAULT_MAX_X = 25;
         const DEFAULT_MIN_Y = 20;
         const DEFAULT_MAX_Y = 40;
-        const EXTEND_PADDING_X = 5;
         const EXTEND_PADDING_Y = 5;
+        const LEFT_PADDING = 10;
+        const RIGHT_PADDING = 5;
         const SEPARATOR = ',';
+
+        function roundTo5(num) {
+            return Math.round(num / 5) * 5;
+        }
+
+        function ceilTo5(num) {
+            return Math.ceil(num / 5) * 5;
+        }
+
+        function floorTo5(num) {
+            return Math.floor(num / 5) * 5;
+        }
 
         function makeTitleEditable(wrapper, titleSpan, index) {
             wrapper.addEventListener('click', () => {
@@ -253,24 +266,26 @@
             if (chart) chart.destroy();
             const ctx = document.getElementById('chart').getContext('2d');
 
-            let allX = [], allY = [];
-            curves.forEach(c => { allX.push(c.x1, c.x2); allY.push(c.y1, c.y2); });
+            let allX1 = [], allX2 = [], allY = [];
+            curves.forEach(c => {
+                allX1.push(c.x1);
+                allX2.push(c.x2);
+                allY.push(c.y1, c.y2);
+            });
 
-            let minX = DEFAULT_MIN_X, maxX = DEFAULT_MAX_X;
-            if (allX.length > 0) {
-                minX = Math.min(minX, Math.min(...allX) - EXTEND_PADDING_X);
-                maxX = Math.max(maxX, Math.max(...allX) + EXTEND_PADDING_X);
-            }
-            const displayMinX = Math.floor(minX);
-            const displayMaxX = Math.ceil(maxX);
+            // X-axis
+            let minLeft = allX1.length > 0 ? Math.min(...allX1) : DEFAULT_MIN_X;
+            let displayMinX = minLeft - ((minLeft+100) % 5) - LEFT_PADDING;
 
-            let minY = DEFAULT_MIN_Y, maxY = DEFAULT_MAX_Y;
-            if (allY.length > 0) {
-                minY = Math.min(minY, Math.min(...allY) - EXTEND_PADDING_Y);
-                maxY = Math.max(maxY, Math.max(...allY) + EXTEND_PADDING_Y);
-            }
-            const displayMinY = Math.floor(minY);
-            const displayMaxY = Math.ceil(maxY);
+            let maxRight = allX2.length > 0 ? Math.max(...allX2) : DEFAULT_MAX_X;
+            let displayMaxX = ceilTo5(maxRight + RIGHT_PADDING);
+
+            // Y-axis: correct ceiling/flooring after padding
+            let rawMinY = allY.length > 0 ? Math.min(...allY) : DEFAULT_MIN_Y;
+            let rawMaxY = allY.length > 0 ? Math.max(...allY) : DEFAULT_MAX_Y;
+
+            let displayMinY = floorTo5(rawMinY - EXTEND_PADDING_Y);
+            let displayMaxY = ceilTo5(rawMaxY + EXTEND_PADDING_Y);
 
             const datasets = curves.map((c, i) => {
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
@@ -306,7 +321,7 @@
                     label: {
                         display: false,
                         content: '',
-                        position: 'end',  // Places label just above the X-axis
+                        position: 'end',
                         backgroundColor: 'rgba(0,0,0,0.8)',
                         color: '#fff',
                         font: { size: 12, weight: 'bold' },
@@ -328,7 +343,7 @@
                     label: {
                         display: false,
                         content: '',
-                        position: 'start',  // Left side, next to Y axis
+                        position: 'start',
                         backgroundColor: color,
                         color: '#fff',
                         font: { size: 11, weight: 'bold' },
@@ -344,7 +359,7 @@
                 options: {
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        tooltip: { enabled: false },  // Tooltip completely disabled
+                        tooltip: { enabled: false },
                         annotation: { annotations: baseAnnotations }
                     },
                     scales: {
@@ -382,14 +397,12 @@
                         }
 
                         const xValue = chart.scales.x.getValueForPixel(x);
-                        const snappedX = Math.round(xValue);  // Snap to whole °C
+                        const snappedX = Math.round(xValue);
 
-                        // Vertical line + label
                         chart.options.plugins.annotation.annotations.vLine.value = snappedX;
                         chart.options.plugins.annotation.annotations.vLine.label.content = `Outdoor temperature: ${snappedX}°C`;
                         chart.options.plugins.annotation.annotations.vLine.label.display = true;
 
-                        // Horizontal lines + labels
                         curves.forEach((curve, i) => {
                             const lwt = getLWTForCurve(curve, snappedX);
                             const roundedY = Math.round(lwt * 10) / 10;
