@@ -63,11 +63,9 @@
             color: #6c757d;
             font-size: 0.85rem;
         }
-        footer img {
-            height: 1.2em;
-            vertical-align: middle;
-            margin-left: 4px;
-            margin-right: 4px;
+        /* Ensure inputs column doesn't stretch full width on desktop */
+        .inputs-column {
+            max-width: 400px; /* Optional: limit width for better look */
         }
     </style>
 </head>
@@ -86,17 +84,17 @@
         </p>
        
         <div class="row">
-            <!-- Left column: curve inputs only -->
-            <div class="col-md-4 order-md-1 order-2">
+            <!-- Inputs column: above on mobile, left on desktop -->
+            <div class="col-md-4 order-md-1 mb-4 mb-md-0 inputs-column">
                 <div id="curves-container" class="mb-4"></div>
-                <button id="add-curve" class="btn btn-primary mb-4">Add Another Curve</button>
+                <button id="add-curve" class="btn btn-primary">Add Another Curve</button>
             </div>
            
-            <!-- Right column: graph + LWT calculator + share -->
-            <div class="col-md-8 order-md-2 order-1">
+            <!-- Chart + tools column: below on mobile, right on desktop -->
+            <div class="col-md-8 order-md-2">
                 <canvas id="chart" class="mb-4"></canvas>
                
-                <!-- LWT Calculator – full width under the graph -->
+                <!-- LWT Calculator -->
                 <div class="card mb-4">
                     <div class="card-body">
                         <h5 class="card-title mb-3">What's my LWT at a given outdoor temperature?</h5>
@@ -108,9 +106,7 @@
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
-                            <div class="col" id="lwt-results">
-                                <!-- Results will appear here, aligned to top -->
-                            </div>
+                            <div class="col" id="lwt-results"></div>
                         </div>
                     </div>
                 </div>
@@ -132,8 +128,8 @@
     </div>
 
     <footer>
-        Vibe-coded by <a href="https://github.com/luksa" target="_blank">Marko Lukša</a> with 
-        <a href="https://grok.com" target="_blank">Grok</a>. 
+        Vibe-coded by <a href="https://github.com/luksa" target="_blank">Marko Lukša</a> with
+        <a href="https://grok.com" target="_blank">Grok</a>.
         Inspired by <a href="https://vscope.at/heizkurve" target="_blank">vscope.at/heizkurve</a>.
     </footer>
    
@@ -257,7 +253,7 @@
                         </div>
                     </div>
                    
-                    <button class="btn btn-danger remove" style="display: ${container.children.length >= 1 ? 'block' : 'none'}">Remove Curve</button>
+                    <button class="btn btn-danger remove">Remove Curve</button>
                 </div>
             `;
             container.appendChild(div);
@@ -551,12 +547,12 @@
 
         document.getElementById('add-curve').addEventListener('click', () => {
             if (curves.length === 0) {
-                addCurve(); // first curve uses defaults
+                addCurve();
             } else {
                 const lastCurve = curves[curves.length - 1];
                 addCurve({
                     x1: lastCurve.x1,
-                    y1: lastCurve.y1 - 5,  // 5°C lower LWT at low point
+                    y1: lastCurve.y1 - 5,
                     x2: lastCurve.x2,
                     y2: lastCurve.y2,
                     name: null
