@@ -127,8 +127,9 @@
         const DEFAULT_MAX_X = 25;
         const DEFAULT_MIN_Y = 20;
         const DEFAULT_MAX_Y = 40;
-        const EXTEND_PADDING_Y = 5;
-        const LEFT_PADDING = 10;
+        const TOP_PADDING = 5;
+        const BOTTOM_PADDING = 5;
+        const LEFT_PADDING = 5;
         const RIGHT_PADDING = 5;
         const SEPARATOR = ',';
 
@@ -320,13 +321,13 @@
                 allY.push(c.y1, c.y2);
             });
             let minLeft = allX1.length > 0 ? Math.min(...allX1) : DEFAULT_MIN_X;
-            let displayMinX = minLeft - ((minLeft+100) % 5) - LEFT_PADDING;
+            let displayMinX = floorTo5(minLeft - LEFT_PADDING);
             let maxRight = allX2.length > 0 ? Math.max(...allX2) : DEFAULT_MAX_X;
             let displayMaxX = ceilTo5(maxRight + RIGHT_PADDING);
             let rawMinY = allY.length > 0 ? Math.min(...allY) : DEFAULT_MIN_Y;
             let rawMaxY = allY.length > 0 ? Math.max(...allY) : DEFAULT_MAX_Y;
-            let displayMinY = floorTo5(rawMinY - EXTEND_PADDING_Y);
-            let displayMaxY = ceilTo5(rawMaxY + EXTEND_PADDING_Y);
+            let displayMinY = floorTo5(rawMinY - BOTTOM_PADDING);
+            let displayMaxY = floorTo5(rawMaxY) + TOP_PADDING;
 
             const datasets = curves.map((c, i) => {
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
