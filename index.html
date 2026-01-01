@@ -59,7 +59,11 @@
                 By <a href="https://github.com/luksa" target="_blank">Marko Lukša</a>
             </div>
         </div>
-        <p class="mb-4">Enter the two points for the curve.</p>
+        <p class="mb-4">
+            This tool helps you visualize and fine-tune weather-dependent heating curves for heat pumps.
+            Define each curve by two points, add multiple curves for easy comparison, and instantly see the leaving water temperature (LWT)
+            for all curves at any chosen outdoor temperature.
+        </p>
        
         <div class="row">
             <!-- Left column: curve inputs only -->
@@ -108,11 +112,12 @@
     </div>
 
     <footer>
-        Inspired by <a href="https://vscope.at/heizkurve" target="_blank">vscope.at/heizkurve</a>
+        Vibe-coded by <a href="https://github.com/luksa" target="_blank">Marko Lukša</a> with Grok. 
+        Inspired by <a href="https://vscope.at/heizkurve" target="_blank">vscope.at/heizkurve</a>.
     </footer>
    
     <script>
-        let curves = []; // now holds {x1, y1, x2, y2, name}
+        let curves = [];
         let chart;
         const DEFAULT_MIN_X = -10;
         const DEFAULT_MAX_X = 25;
@@ -157,11 +162,23 @@
             });
         }
 
+        function updateRemoveButtons() {
+            const cards = document.querySelectorAll('#curves-container > .card');
+            cards.forEach(card => {
+                const removeBtn = card.querySelector('.remove');
+                if (cards.length === 1) {
+                    if (removeBtn) removeBtn.style.display = 'none';
+                } else {
+                    if (removeBtn) removeBtn.style.display = 'block';
+                }
+            });
+        }
+
         function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null}) {
             const container = document.getElementById('curves-container');
             const div = document.createElement('div');
             div.className = 'card mb-3';
-            const index = container.children.length; // before appending
+            const index = container.children.length;
             const defaultName = `Curve ${index + 1}`;
             const name = data.name || defaultName;
 
@@ -215,7 +232,7 @@
                         </div>
                     </div>
                    
-                    <button class="btn btn-danger remove">Remove Curve</button>
+                    <button class="btn btn-danger remove" style="display: ${container.children.length >= 1 ? 'block' : 'none'}">Remove Curve</button>
                 </div>
             `;
             container.appendChild(div);
@@ -226,12 +243,15 @@
             div.querySelectorAll('input[type="number"]').forEach(input => {
                 input.addEventListener('change', updateAll);
             });
-            div.querySelector('.remove').addEventListener('click', () => {
-                div.remove();
-                updateAll();
-            });
 
-            // store curve data
+            const removeBtn = div.querySelector('.remove');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    div.remove();
+                    updateAll();
+                });
+            }
+
             curves.push({
                 x1: data.x1,
                 y1: data.y1,
@@ -252,12 +272,13 @@
                 const x2 = parseFloat(div.querySelector('.x2').value);
                 const y2 = parseFloat(div.querySelector('.y2').value);
                 let name = div.querySelector('.curve-title').textContent.trim();
-                if (!name || name === `Curve ${i + 1}`) name = `Curve ${i + 1}`;
+                if (!name) name = `Curve ${i + 1}`;
 
                 if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
                     curves.push({x1, y1, x2, y2, name});
                 }
             });
+            updateRemoveButtons();
             updateChart();
             updateURL();
             calculateLWT(parseFloat(document.getElementById('oat-input').value) || NaN);
@@ -445,7 +466,6 @@
             }
             const params = new URLSearchParams(search);
 
-            // Find how many curves are defined
             const curveKeys = Array.from(params.keys())
                 .filter(k => k.startsWith('curve'))
                 .map(k => parseInt(k.match(/curve(\d+)/)[1]))
@@ -503,7 +523,21 @@
             document.getElementById('copy-clipboard').addEventListener('click', copyToClipboard);
         });
 
-        document.getElementById('add-curve').addEventListener('click', () => addCurve());
+        document.getElementById('add-curve').addEventListener('click', () => {
+            if (curves.length === 0) {
+                addCurve(); // first curve uses defaults
+            } else {
+                const lastCurve = curves[curves.length - 1];
+                addCurve({
+                    x1: lastCurve.x1,
+                    y1: lastCurve.y1 - 5,  // 5°C lower LWT at low point
+                    x2: lastCurve.x2,
+                    y2: lastCurve.y2,
+                    name: null
+                });
+            }
+        });
+
         document.getElementById('oat-input').addEventListener('input', (e) => {
             const oat = parseFloat(e.target.value);
             calculateLWT(oat);
