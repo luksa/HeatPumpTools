@@ -20,13 +20,6 @@
         @media (max-width: 576px) {
             .by-line { position: static; text-align: right; margin-top: 0.5rem; }
         }
-        .share-buttons {
-            margin-top: 1rem;
-        }
-        .share-buttons .btn {
-            margin-right: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
         .narrow-input {
             max-width: 10ch;
         }
@@ -340,41 +333,7 @@
                             max: displayMaxY,
                             ticks: { stepSize: 5 }
                         }
-                    },
-                    plugins: [{
-                        id: 'crosshair',
-                        afterDatasetsDraw: function(chartInstance) {
-                            const tooltip = chartInstance.tooltip;
-                            if (tooltip && tooltip.opacity > 0) {
-                                const activeElements = tooltip.dataPoints;
-                                if (activeElements && activeElements.length > 0) {
-                                    const ctx = chartInstance.ctx;
-                                    const x = activeElements[0].element.x;
-                                    const y = activeElements[0].element.y;
-                                    const chartArea = chartInstance.chartArea;
-
-                                    ctx.save();
-                                    ctx.setLineDash([6, 4]);
-                                    ctx.lineWidth = 1.5;
-                                    ctx.strokeStyle = 'rgba(80, 80, 80, 0.8)';
-
-                                    // Vertical line
-                                    ctx.beginPath();
-                                    ctx.moveTo(x, chartArea.top);
-                                    ctx.lineTo(x, chartArea.bottom);
-                                    ctx.stroke();
-
-                                    // Horizontal line (left to point)
-                                    ctx.beginPath();
-                                    ctx.moveTo(chartArea.left, y);
-                                    ctx.lineTo(x, y);
-                                    ctx.stroke();
-
-                                    ctx.restore();
-                                }
-                            }
-                        }
-                    }]
+                    }
                 }
             });
         }
