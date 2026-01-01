@@ -224,17 +224,40 @@
                 maxX = Math.max(maxX, actualMax + EXTEND_PADDING);
             }
 
+            // Round minX down and maxX up to nearest integer for clean steps
+            const displayMinX = Math.floor(minX);
+            const displayMaxX = Math.ceil(maxX);
+
             const datasets = curves.map((c, i) => {
                 let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
                 const leftPoint = points[0];
                 const rightPoint = points[1];
 
-                const data = [
-                    {x: minX, y: leftPoint.y},
-                    {x: leftPoint.x, y: leftPoint.y},
-                    {x: rightPoint.x, y: rightPoint.y},
-                    {x: maxX, y: rightPoint.y}
-                ];
+                const data = [];
+
+                // Left horizontal section: integer points from displayMinX to floor(leftPoint.x)
+                for (let temp = displayMinX; temp <= Math.floor(leftPoint.x); temp++) {
+                    data.push({x: temp, y: leftPoint.y});
+                }
+
+                // Main left point (already included above if integer, but ensure it's there)
+                data.push({x: leftPoint.x, y: leftPoint.y});
+
+                // Sloped section: integer points strictly between left and right
+                const slopeStart = Math.ceil(leftPoint.x);
+                const slopeEnd = Math.floor(rightPoint.x);
+                for (let temp = slopeStart; temp < slopeEnd; temp++) {
+                    const y = getLWTForCurve(c, temp);
+                    data.push({x: temp, y: y});
+                }
+
+                // Main right point
+                data.push({x: rightPoint.x, y: rightPoint.y});
+
+                // Right horizontal section: integer points from ceil(rightPoint.x) to displayMaxX
+                for (let temp = Math.ceil(rightPoint.x); temp <= displayMaxX; temp++) {
+                    data.push({x: temp, y: rightPoint.y});
+                }
 
                 return {
                     label: `Curve ${i + 1}`,
@@ -243,10 +266,25 @@
                     backgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
                     fill: false,
                     tension: 0,
-                    pointRadius: 5,
-                    pointHoverRadius: 8,
-                    showLine: true,
-                    spanGaps: false
+                    pointRadius: function(context) {
+                        const value = context.parsed.x;
+                        // Main points (user-entered): larger
+                        if (value === leftPoint.x || value === rightPoint.x) {
+                            return 5;
+                        }
+                        // All intermediate/horizontal points: invisible normally
+                        return 0;
+                    },
+                    pointHoverRadius: function(context) {
+                        const value = context.parsed.x;
+                        if (value === leftPoint.x || value === rightPoint.x) {
+                            return 8;
+                        }
+                        // Show a small dot when hovered
+                        return 4;
+                    },
+                    pointBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
+                    pointHoverBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`
                 };
             });
 
@@ -284,8 +322,8 @@
                             type: 'linear',
                             position: 'bottom',
                             title: { display: true, text: 'Outdoor Temperature (°C)' },
-                            min: minX,
-                            max: maxX,
+                            min: displayMinX,
+                            max: displayMaxX,
                             ticks: { stepSize: 5 }
                         },
                         y: {
