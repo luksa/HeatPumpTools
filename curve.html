@@ -287,14 +287,15 @@
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
 
+            // this is fragile, since it assumes that querySelectorAll returns the fields in the right order
             const inputs = activePane.querySelectorAll('input[type="number"]');
             const index = Array.from(document.querySelectorAll('.tab-pane')).indexOf(activePane);
 
             if (index >= 0 && index < curves.length) {
-                curves[index].x1 = parseFloat(inputs[0].value) || curves[index].x1;
-                curves[index].y1 = parseFloat(inputs[1].value) || curves[index].y1;
-                curves[index].x2 = parseFloat(inputs[2].value) || curves[index].x2;
-                curves[index].y2 = parseFloat(inputs[3].value) || curves[index].y2;
+                curves[index].x1 = parseFloat(inputs[1].value) || curves[index].x1;
+                curves[index].y1 = parseFloat(inputs[0].value) || curves[index].y1;
+                curves[index].x2 = parseFloat(inputs[3].value) || curves[index].x2;
+                curves[index].y2 = parseFloat(inputs[2].value) || curves[index].y2;
             }
 
             updateChart();
