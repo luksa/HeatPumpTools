@@ -287,16 +287,23 @@
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
 
-            // this is fragile, since it assumes that querySelectorAll returns the fields in the right order
-            const inputs = activePane.querySelectorAll('input[type="number"]');
+            // Find the index of the active curve
             const index = Array.from(document.querySelectorAll('.tab-pane')).indexOf(activePane);
+            if (index < 0 || index >= curves.length) return;
 
-            if (index >= 0 && index < curves.length) {
-                curves[index].x1 = parseFloat(inputs[1].value) || curves[index].x1;
-                curves[index].y1 = parseFloat(inputs[0].value) || curves[index].y1;
-                curves[index].x2 = parseFloat(inputs[3].value) || curves[index].x2;
-                curves[index].y2 = parseFloat(inputs[2].value) || curves[index].y2;
-            }
+            const curve = curves[index];
+
+            // Use specific classes to select inputs, regardless of DOM order
+            const y1Input = activePane.querySelector('.y1');
+            const x1Input = activePane.querySelector('.x1');
+            const y2Input = activePane.querySelector('.y2');
+            const x2Input = activePane.querySelector('.x2');
+
+            // Update values only if inputs exist and have valid numbers
+            if (y1Input) curve.y1 = parseFloat(y1Input.value) || curve.y1;
+            if (x1Input) curve.x1 = parseFloat(x1Input.value) || curve.x1;
+            if (y2Input) curve.y2 = parseFloat(y2Input.value) || curve.y2;
+            if (x2Input) curve.x2 = parseFloat(x2Input.value) || curve.x2;
 
             updateChart();
             updateURL();
