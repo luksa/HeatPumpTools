@@ -158,10 +158,24 @@
             if (currentRenameIndex === -1) return;
             const newName = renameInput.value.trim() || `Curve ${currentRenameIndex + 1}`;
             curves[currentRenameIndex].name = newName;
+
+            const activeTabButton = document.querySelector('.nav-link.active');
+            const activeTabId = activeTabButton?.id;
+
             updateTabsAndContent();
             updateChart();
             updateURL();
             calculateLWT();
+
+            // restore previously active tab
+            if (activeTabId) {
+                const tabToActivate = document.getElementById(activeTabId);
+                if (tabToActivate) {
+                    const bsTab = new bootstrap.Tab(tabToActivate);
+                    bsTab.show();
+                }
+            }
+
             renameModal.hide();
         }
 
