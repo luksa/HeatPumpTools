@@ -283,6 +283,14 @@
             }
         }
 
+        function getNumber(input, defaultValue) {
+          if (input) {
+            const n = parseFloat(input);
+            return isNaN(n) ? defaultValue : n;
+          }
+          return defaultValue;
+        }
+
         function updateAll() {
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
@@ -300,10 +308,10 @@
             const x2Input = activePane.querySelector('.x2');
 
             // Update values only if inputs exist and have valid numbers
-            if (y1Input) curve.y1 = parseFloat(y1Input.value) || curve.y1;
-            if (x1Input) curve.x1 = parseFloat(x1Input.value) || curve.x1;
-            if (y2Input) curve.y2 = parseFloat(y2Input.value) || curve.y2;
-            if (x2Input) curve.x2 = parseFloat(x2Input.value) || curve.x2;
+            curve.y1 = getNumber(y1Input.value, curve.y1);
+            curve.x1 = getNumber(x1Input.value, curve.x1);
+            curve.y2 = getNumber(y2Input.value, curve.y2);
+            curve.x2 = getNumber(x2Input.value, curve.x2);
 
             updateChart();
             updateURL();
