@@ -27,7 +27,6 @@
         .lwt-row { align-items: flex-start; }
         footer { margin-top: 4rem; text-align: center; color: #6c757d; font-size: 0.85rem; }
         .inputs-column { max-width: 400px; }
-        /* Proper tab connection */
         .nav-tabs .nav-link {
             border-bottom-color: transparent;
         }
@@ -128,19 +127,19 @@
         const DEFAULT_MAX_X = 25;
         const DEFAULT_MIN_Y = 20;
         const DEFAULT_MAX_Y = 40;
-        const TOP_PADDING = 5;
+        const TOP_PADDING    = 5;
         const BOTTOM_PADDING = 5;
-        const LEFT_PADDING = 5;
-        const RIGHT_PADDING = 5;
+        const LEFT_PADDING   = 5;
+        const RIGHT_PADDING  = 5;
         const SEPARATOR = ',';
 
         function roundTo5(num) { return Math.round(num / 5) * 5; }
-        function ceilTo5(num) { return Math.ceil(num / 5) * 5; }
+        function ceilTo5(num)  { return Math.ceil(num  / 5) * 5; }
         function floorTo5(num) { return Math.floor(num / 5) * 5; }
 
         let renameModal = null;
         let renameInput = null;
-        let renameSave = null;
+        let renameSave  = null;
         let currentRenameIndex = -1;
 
         function openRenameModal(index) {
@@ -167,13 +166,9 @@
             updateURL();
             calculateLWT();
 
-            // restore previously active tab
             if (activeTabId) {
                 const tabToActivate = document.getElementById(activeTabId);
-                if (tabToActivate) {
-                    const bsTab = new bootstrap.Tab(tabToActivate);
-                    bsTab.show();
-                }
+                if (tabToActivate) new bootstrap.Tab(tabToActivate).show();
             }
 
             renameModal.hide();
@@ -195,7 +190,6 @@
                 const tabId = `curve-tab-${i}`;
                 const li = document.createElement('li');
                 li.className = 'nav-item';
-                li.role = 'presentation';
                 li.innerHTML = `
                     <button class="nav-link ${i === 0 ? 'active' : ''}" 
                             id="${tabId}-tab" 
@@ -253,6 +247,48 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-bold">Adjustments</h6>
+                        <div class="row align-items-center mb-2">
+                            <label class="col-sm-7 col-form-label text-sm-end">Offset</label>
+                            <div class="col-sm-5">
+                                <div class="input-group">
+                                    <input type="number" class="form-control narrow-input offset" value="${curve.offset ?? 0}" step="1">
+                                    <span class="input-group-text">°C</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input show-unoffset" type="checkbox" id="show-unoffset-${i}" ${curve.showUnoffset ? 'checked' : ''}>
+                            <label class="form-check-label" for="show-unoffset-${i}">
+                                Show unoffset curve
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-bold">Space heating settings</h6>
+                        <div class="row align-items-center mb-2">
+                            <label class="col-sm-7 col-form-label text-sm-end">Heating Minimum</label>
+                            <div class="col-sm-5">
+                                <div class="input-group">
+                                    <input type="number" class="form-control narrow-input hmin" value="${curve.hmin ?? ''}" placeholder="—" step="1">
+                                    <span class="input-group-text">°C</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row align-items-center mb-3">
+                            <label class="col-sm-7 col-form-label text-sm-end">Heating Maximum</label>
+                            <div class="col-sm-5">
+                                <div class="input-group">
+                                    <input type="number" class="form-control narrow-input hmax" value="${curve.hmax ?? ''}" placeholder="—" step="1">
+                                    <span class="input-group-text">°C</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary rename" data-index="${i}">Rename Curve</button>
                         <button class="btn btn-danger remove" data-index="${i}">Remove Curve</button>
@@ -260,10 +296,14 @@
                 tabContent.appendChild(pane);
             });
 
-            document.querySelectorAll('input[type="number"]').forEach(input => {
-                input.removeEventListener('change', updateAll);
-                input.addEventListener('change', updateAll);
+            // Re-attach listeners
+            document.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(el => {
+                el.removeEventListener('change', updateAll);
+                el.removeEventListener('input', updateAll);
+                el.addEventListener('change', updateAll);
+                el.addEventListener('input', updateAll);
             });
+
             document.querySelectorAll('.rename').forEach(btn => {
                 btn.addEventListener('click', () => openRenameModal(parseInt(btn.dataset.index)));
             });
@@ -278,54 +318,50 @@
             updateRemoveButtons();
         }
 
-        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null}) {
+        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null, offset: 0, hmin: null, hmax: null, showUnoffset: false}) {
             const defaultName = `Curve ${curves.length + 1}`;
             curves.push({
                 x1: data.x1,
                 y1: data.y1,
                 x2: data.x2,
                 y2: data.y2,
-                name: data.name || defaultName
+                name: data.name || defaultName,
+                offset: data.offset ?? 0,
+                hmin: data.hmin ?? null,
+                hmax: data.hmax ?? null,
+                showUnoffset: !!data.showUnoffset
             });
             updateTabsAndContent();
             updateAll();
 
             const newTabBtn = document.querySelector(`#curve-tab-${curves.length - 1}-tab`);
-            if (newTabBtn) {
-                const bsTab = new bootstrap.Tab(newTabBtn);
-                bsTab.show();
-            }
+            if (newTabBtn) new bootstrap.Tab(newTabBtn).show();
         }
 
-        function getNumber(input, defaultValue) {
-          if (input) {
-            const n = parseFloat(input);
-            return isNaN(n) ? defaultValue : n;
-          }
-          return defaultValue;
+        function getNumber(val, def = null) {
+            if (val === "" || val == null) return def;
+            const n = parseFloat(val);
+            return isNaN(n) ? def : n;
         }
 
         function updateAll() {
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
 
-            // Find the index of the active curve
             const index = Array.from(document.querySelectorAll('.tab-pane')).indexOf(activePane);
             if (index < 0 || index >= curves.length) return;
 
             const curve = curves[index];
 
-            // Use specific classes to select inputs, regardless of DOM order
-            const y1Input = activePane.querySelector('.y1');
-            const x1Input = activePane.querySelector('.x1');
-            const y2Input = activePane.querySelector('.y2');
-            const x2Input = activePane.querySelector('.x2');
+            curve.y1 = getNumber(activePane.querySelector('.y1')?.value, curve.y1);
+            curve.x1 = getNumber(activePane.querySelector('.x1')?.value, curve.x1);
+            curve.y2 = getNumber(activePane.querySelector('.y2')?.value, curve.y2);
+            curve.x2 = getNumber(activePane.querySelector('.x2')?.value, curve.x2);
 
-            // Update values only if inputs exist and have valid numbers
-            curve.y1 = getNumber(y1Input.value, curve.y1);
-            curve.x1 = getNumber(x1Input.value, curve.x1);
-            curve.y2 = getNumber(y2Input.value, curve.y2);
-            curve.x2 = getNumber(x2Input.value, curve.x2);
+            curve.offset      = getNumber(activePane.querySelector('.offset')?.value, 0);
+            curve.hmin        = getNumber(activePane.querySelector('.hmin')?.value, null);
+            curve.hmax        = getNumber(activePane.querySelector('.hmax')?.value, null);
+            curve.showUnoffset = activePane.querySelector('.show-unoffset')?.checked ?? false;
 
             updateChart();
             updateURL();
@@ -333,54 +369,125 @@
             displayDefaultCrosshair();
         }
 
-        function getLWTForCurve(curve, oat) {
+        function applyOffsetAndClamp(baseLWT, offset, hmin, hmax) {
+            let lwt = baseLWT + (offset || 0);
+            if (hmin != null) lwt = Math.max(lwt, hmin);
+            if (hmax != null) lwt = Math.min(lwt, hmax);
+            return lwt;
+        }
+
+        function getLWTForCurve(curve, oat, useOffset = true) {
             let points = [{x: curve.x1, y: curve.y1}, {x: curve.x2, y: curve.y2}].sort((a, b) => a.x - b.x);
             const left = points[0];
             const right = points[1];
-            if (oat <= left.x) return left.y;
-            if (oat >= right.x) return right.y;
-            const slope = (right.y - left.y) / (right.x - left.x);
-            return left.y + slope * (oat - left.x);
+
+            let baseLWT;
+            if (oat <= left.x) baseLWT = left.y;
+            else if (oat >= right.x) baseLWT = right.y;
+            else {
+                const slope = (right.y - left.y) / (right.x - left.x);
+                baseLWT = left.y + slope * (oat - left.x);
+            }
+
+            return useOffset 
+                ? applyOffsetAndClamp(baseLWT, curve.offset, curve.hmin, curve.hmax)
+                : applyOffsetAndClamp(baseLWT, 0,           curve.hmin, curve.hmax);
         }
 
         function updateChart() {
             if (chart) chart.destroy();
             const ctx = document.getElementById('chart').getContext('2d');
-            let allX1 = [], allX2 = [], allY = [];
-            curves.forEach(c => {
-                allX1.push(c.x1);
-                allX2.push(c.x2);
-                allY.push(c.y1, c.y2);
-            });
-            let minLeft = allX1.length > 0 ? Math.min(...allX1) : DEFAULT_MIN_X;
-            let displayMinX = floorTo5(minLeft - LEFT_PADDING);
-            let maxRight = allX2.length > 0 ? Math.max(...allX2) : DEFAULT_MAX_X;
-            let displayMaxX = ceilTo5(maxRight + RIGHT_PADDING);
-            let rawMinY = allY.length > 0 ? Math.min(...allY) : DEFAULT_MIN_Y;
-            let rawMaxY = allY.length > 0 ? Math.max(...allY) : DEFAULT_MAX_Y;
-            let displayMinY = floorTo5(rawMinY - BOTTOM_PADDING);
-            let displayMaxY = floorTo5(rawMaxY) + TOP_PADDING;
 
-            const datasets = curves.map((c, i) => {
-                let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a, b) => a.x - b.x);
-                const left = points[0], right = points[1];
-                const data = [];
-                for (let t = displayMinX; t <= Math.floor(left.x); t++) data.push({x: t, y: left.y});
-                data.push({x: left.x, y: left.y});
-                for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) data.push({x: t, y: getLWTForCurve(c, t)});
-                data.push({x: right.x, y: right.y});
-                for (let t = Math.ceil(right.x); t <= displayMaxX; t++) data.push({x: t, y: right.y});
-                return {
-                    label: c.name,
-                    data,
-                    borderColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
-                    backgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`,
-                    fill: false,
-                    tension: 0,
-                    pointRadius: ctx => (ctx.parsed.x === left.x || ctx.parsed.x === right.x) ? 5 : 0,
-                    pointHoverRadius: ctx => (ctx.parsed.x === left.x || ctx.parsed.x === right.x) ? 8 : 4,
-                    pointBackgroundColor: `hsl(${i * 137 % 360}, 70%, 50%)`
-                };
+            let allX = [], allBaseY = [], allOffsetY = [];
+            curves.forEach(c => {
+                allX.push(c.x1, c.x2);
+                const baseMin = Math.min(c.y1, c.y2);
+                const baseMax = Math.max(c.y1, c.y2);
+                allBaseY.push(baseMin, baseMax);
+
+                const offMin = applyOffsetAndClamp(baseMin, c.offset, c.hmin, c.hmax);
+                const offMax = applyOffsetAndClamp(baseMax, c.offset, c.hmin, c.hmax);
+                allOffsetY.push(offMin, offMax);
+            });
+
+            const minX = allX.length ? Math.min(...allX) : DEFAULT_MIN_X;
+            const maxX = allX.length ? Math.max(...allX) : DEFAULT_MAX_X;
+            const displayMinX = floorTo5(minX - LEFT_PADDING);
+            const displayMaxX = ceilTo5 (maxX + RIGHT_PADDING);
+
+            const rawMinY = Math.min(...allBaseY, ...allOffsetY);
+            const rawMaxY = Math.max(...allBaseY, ...allOffsetY);
+            const displayMinY = floorTo5(rawMinY - BOTTOM_PADDING);
+            const displayMaxY = ceilTo5 (rawMaxY + TOP_PADDING);
+
+            const datasets = [];
+
+            curves.forEach((c, i) => {
+                const hue = i * 137 % 360;
+                const baseColor = `hsl(${hue}, 70%, 50%)`;
+                const dimColor  = `hsl(${hue}, 50%, 65%)`;
+
+                let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a,b)=>a.x-b.x);
+                const left  = points[0];
+                const right = points[1];
+
+                // ───────────────────────────────────────────────
+                //  Offset curve (always shown)
+                // ───────────────────────────────────────────────
+                const dataOffset = [];
+                for (let t = displayMinX; t <= Math.floor(left.x); t++) {
+                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
+                }
+                dataOffset.push({x: left.x, y: getLWTForCurve(c, left.x, true)});
+                for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) {
+                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
+                }
+                dataOffset.push({x: right.x, y: getLWTForCurve(c, right.x, true)});
+                for (let t = Math.ceil(right.x); t <= displayMaxX; t++) {
+                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
+                }
+
+                datasets.push({
+                    label: `${c.name} (with offset)`,
+                    data: dataOffset,
+                    borderColor: baseColor,
+                    backgroundColor: baseColor,
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    tension: 0
+                });
+
+                // ───────────────────────────────────────────────
+                //  Unoffset curve (optional)
+                // ───────────────────────────────────────────────
+                if (c.showUnoffset) {
+                    const dataBase = [];
+                    for (let t = displayMinX; t <= Math.floor(left.x); t++) {
+                        dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
+                    }
+                    dataBase.push({x: left.x, y: getLWTForCurve(c, left.x, false)});
+                    for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) {
+                        dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
+                    }
+                    dataBase.push({x: right.x, y: getLWTForCurve(c, right.x, false)});
+                    for (let t = Math.ceil(right.x); t <= displayMaxX; t++) {
+                        dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
+                    }
+
+                    datasets.push({
+                        label: `${c.name} (w/o offset)`,
+                        data: dataBase,
+                        borderColor: dimColor,
+                        backgroundColor: dimColor,
+                        borderWidth: 2,
+                        borderDash: [3, 3],
+                        pointRadius: ctx => {
+                            const x = ctx.parsed.x;
+                            return (x === Math.round(left.x) || x === Math.round(right.x)) ? 6 : 0;
+                        },
+                        tension: 0
+                    });
+                }
             });
 
             const baseAnnotations = {
@@ -388,22 +495,24 @@
                     type: 'line',
                     scaleID: 'x',
                     value: null,
-                    borderColor: 'rgba(80, 80, 80, 0.9)',
+                    borderColor: 'rgba(80,80,80,0.9)',
                     borderWidth: 1.5,
-                    borderDash: [6, 4],
-                    label: { display: false, content: '', position: 'end', backgroundColor: 'rgba(0,0,0,0.8)', color: '#fff', font: { size: 12, weight: 'bold' }, padding: 6, borderRadius: 4 }
+                    borderDash: [6,4],
+                    label: { display: false, content: '', position: 'end', backgroundColor: 'rgba(0,0,0,0.8)', color: '#fff', font: {size:12, weight:'bold'}, padding:6, borderRadius:4 }
                 }
             };
-            curves.forEach((curve, i) => {
-                const color = `hsl(${i * 137 % 360}, 70%, 50%)`;
+
+            // One horizontal line per *logical* curve → points to the **offset** value
+            curves.forEach((c, i) => {
+                const hue = i * 137 % 360;
                 baseAnnotations[`hLine${i}`] = {
                     type: 'line',
                     scaleID: 'y',
                     value: null,
-                    borderColor: color,
+                    borderColor: `hsl(${hue}, 70%, 50%)`,
                     borderWidth: 1.5,
-                    borderDash: [6, 4],
-                    label: { display: false, content: '', position: 'start', backgroundColor: color, color: '#fff', font: { size: 11, weight: 'bold' }, padding: 5, borderRadius: 4 }
+                    borderDash: [6,4],
+                    label: { display: false, content: '', position: 'start', backgroundColor: `hsl(${hue}, 70%, 50%)`, color: '#fff', font: {size:11, weight:'bold'}, padding:5, borderRadius:4 }
                 };
             });
 
@@ -415,6 +524,7 @@
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         tooltip: { enabled: false },
+                        legend: { position: 'top' },
                         annotation: { annotations: baseAnnotations }
                     },
                     scales: {
@@ -434,25 +544,22 @@
                         }
                     },
                     onHover: (event, activeElements) => {
-                        const chartArea = chart.chartArea;
-                        if (!event.native || !chartArea) return;
-                        const x = event.x;
-                        const y = event.y;
-                        if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) {
+                        const area = chart.chartArea;
+                        if (!event.native || !area) return;
+                        const x = event.x, y = event.y;
+                        if (x < area.left || x > area.right || y < area.top || y > area.bottom) {
                             displayDefaultCrosshair();
                             return;
                         }
-                        const xValue = chart.scales.x.getValueForPixel(x);
-                        const snappedX = Math.round(xValue);
-                        displayCrosshair(snappedX);
+                        const xVal = chart.scales.x.getValueForPixel(x);
+                        const snapped = Math.round(xVal);
+                        displayCrosshair(snapped);
                     }
                 },
                 plugins: [{
                     id: 'hideCrosshairOnLeave',
-                    afterEvent: (chart, args) => {
-                        if (args.event.type === 'mouseout') {
-                            displayDefaultCrosshair();
-                        }
+                    afterEvent: (ch, args) => {
+                        if (args.event.type === 'mouseout') displayDefaultCrosshair();
                     }
                 }]
             });
@@ -462,84 +569,113 @@
             displayCrosshair(oat);
         }
 
-        function displayCrosshair(oat) {
-            if (oat === NaN) {
+        function displayCrosshair(oatVal) {
+            if (isNaN(oatVal)) {
                 chart.options.plugins.annotation.annotations.vLine.value = null;
                 chart.options.plugins.annotation.annotations.vLine.label.display = false;
                 curves.forEach((_, i) => {
-                    chart.options.plugins.annotation.annotations[`hLine${i}`].value = null;
-                        chart.options.plugins.annotation.annotations[`hLine${i}`].label.display = false;
+                    const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
+                    h.value = null;
+                    h.label.display = false;
                 });
                 chart.update('none');
                 return;
             }
 
-            chart.options.plugins.annotation.annotations.vLine.value = oat;
-            chart.options.plugins.annotation.annotations.vLine.label.content = `Outdoor temperature: ${oat}°C`;
+            chart.options.plugins.annotation.annotations.vLine.value = oatVal;
+            chart.options.plugins.annotation.annotations.vLine.label.content = `Outdoor: ${oatVal} °C`;
             chart.options.plugins.annotation.annotations.vLine.label.display = true;
-            curves.forEach((curve, i) => {
-                const lwt = getLWTForCurve(curve, oat);
-                const roundedY = Math.round(lwt * 10) / 10;
-                const color = `hsl(${i * 137 % 360}, 70%, 50%)`;
-                const hLine = chart.options.plugins.annotation.annotations[`hLine${i}`];
-                hLine.value = roundedY;
-                hLine.borderColor = color;
-                hLine.label.content = `LWT: ${roundedY}°C`;
-                hLine.label.backgroundColor = color;
-                hLine.label.display = true;
+
+            curves.forEach((c, i) => {
+                const lwt = getLWTForCurve(c, oatVal, true); // always show offset value in crosshair
+                const rounded = Math.round(lwt * 10) / 10;
+                const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
+                h.value = rounded;
+                h.label.content = `LWT: ${rounded} °C`;
+                h.label.display = true;
             });
+
             chart.update('none');
         }
 
         function updateURL() {
-            const base = window.location.pathname;
-            const queryParts = [];
-            curves.forEach((curve, i) => {
-                queryParts.push(`curve${i + 1}=${curve.x1}${SEPARATOR}${curve.y1}${SEPARATOR}${curve.x2}${SEPARATOR}${curve.y2}`);
-                queryParts.push(`name${i + 1}=${encodeURIComponent(curve.name)}`);
+            const parts = [];
+            curves.forEach((c, i) => {
+                let curveStr = `${c.x1}${SEPARATOR}${c.y1}${SEPARATOR}${c.x2}${SEPARATOR}${c.y2}`;
+                if (c.offset !== 0 || c.hmin != null || c.hmax != null) {
+                    curveStr += `${SEPARATOR}${c.offset}`;
+                    if (c.hmin != null || c.hmax != null) {
+                        curveStr += `${SEPARATOR}${c.hmin ?? ''}${SEPARATOR}${c.hmax ?? ''}`;
+                    }
+                }
+                parts.push(`curve${i+1}=${curveStr}`);
+                parts.push(`name${i+1}=${encodeURIComponent(c.name)}`);
+                if (c.showUnoffset) parts.push(`unoffset${i+1}=1`);
             });
+            if (!isNaN(oat)) parts.push(`oat=${oat}`);
 
-            if (!isNaN(oat)) queryParts.push(`oat=${oat}`);
-            queryParts.sort();
-            const newQuery = queryParts.join('&');
-            history.replaceState(null, '', newQuery ? `${base}?${newQuery}` : base);
+            parts.sort();
+            const query = parts.join('&');
+            const newUrl = query ? `?${query}` : '';
+            history.replaceState(null, '', window.location.pathname + newUrl);
         }
 
         async function copyToClipboard() {
             try {
                 await navigator.clipboard.writeText(window.location.href);
-                const feedback = document.getElementById('copy-feedback');
-                feedback.classList.remove('d-none');
-                setTimeout(() => feedback.classList.add('d-none'), 3000);
-            } catch (err) {
-                alert('Failed to copy link. Please copy it manually from the address bar.');
+                const fb = document.getElementById('copy-feedback');
+                fb.classList.remove('d-none');
+                setTimeout(() => fb.classList.add('d-none'), 3000);
+            } catch {
+                alert('Failed to copy. Please copy URL manually.');
             }
         }
 
         function loadFromURL() {
-            const search = window.location.search.substring(1);
-            if (!search) { addCurve(); return; }
-
-            const params = new URLSearchParams(search);
-
+            const params = new URLSearchParams(window.location.search.substring(1));
             if (params.has('oat')) {
                 oat = parseFloat(params.get('oat'));
             }
 
-            const curveKeys = [...params.keys()].filter(k => k.startsWith('curve')).map(k => parseInt(k.match(/curve(\d+)/)[1])).sort((a,b) => a-b);
-            if (curveKeys.length === 0) { addCurve(); return; }
-            const maxIndex = Math.max(...curveKeys);
-            for (let i = 1; i <= maxIndex; i++) {
-                const curveParam = params.get(`curve${i}`);
-                const nameParam = params.get(`name${i}`);
-                if (curveParam) {
-                    const [x1, y1, x2, y2] = curveParam.split(SEPARATOR).map(parseFloat);
-                    if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                        addCurve({ x1, y1, x2, y2, name: nameParam ? decodeURIComponent(nameParam) : null });
-                    }
-                }
+            const curveKeys = [...params.keys()]
+                .filter(k => k.startsWith('curve'))
+                .map(k => parseInt(k.match(/curve(\d+)/)?.[1] ?? -1))
+                .filter(n => n >= 1)
+                .sort((a,b)=>a-b);
+
+            if (curveKeys.length === 0) {
+                addCurve();
+                return;
             }
 
+            const maxIdx = Math.max(...curveKeys);
+            for (let i = 1; i <= maxIdx; i++) {
+                const curveParam = params.get(`curve${i}`);
+                if (!curveParam) continue;
+
+                const parts = curveParam.split(SEPARATOR).map(s => s.trim());
+                if (parts.length < 4) continue;
+
+                const [x1s, y1s, x2s, y2s, ...rest] = parts;
+                const x1 = parseFloat(x1s);
+                const y1 = parseFloat(y1s);
+                const x2 = parseFloat(x2s);
+                const y2 = parseFloat(y2s);
+
+                if ([x1,y1,x2,y2].some(isNaN)) continue;
+
+                let offset = 0, hmin = null, hmax = null;
+                if (rest.length >= 1) offset = parseFloat(rest[0]) || 0;
+                if (rest.length >= 3) {
+                    hmin = rest[1] ? parseFloat(rest[1]) : null;
+                    hmax = rest[2] ? parseFloat(rest[2]) : null;
+                }
+
+                const name = params.has(`name${i}`) ? decodeURIComponent(params.get(`name${i}`)) : null;
+                const showUnoffset = params.has(`unoffset${i}`) && params.get(`unoffset${i}`) === '1';
+
+                addCurve({x1, y1, x2, y2, name, offset, hmin, hmax, showUnoffset});
+            }
 
             if (!isNaN(oat)) {
                 document.getElementById('oat-input').value = oat;
@@ -549,27 +685,25 @@
         }
 
         function calculateLWT() {
-            const results = document.getElementById('lwt-results');
-            results.innerHTML = '';
+            const container = document.getElementById('lwt-results');
+            container.innerHTML = '';
             if (isNaN(oat)) return;
+
             curves.forEach(c => {
-                const lwt = getLWTForCurve(c, oat);
+                const lwt = getLWTForCurve(c, oat, true);
                 const p = document.createElement('p');
                 p.textContent = `${c.name}: LWT = ${lwt.toFixed(1)} °C`;
-                results.appendChild(p);
+                container.appendChild(p);
             });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
             renameInput = document.getElementById('renameInput');
-            renameSave = document.getElementById('renameSave');
+            renameSave  = document.getElementById('renameSave');
 
-            // Save on button click
             renameSave.addEventListener('click', saveRename);
-
-            // Save on Enter key in input field
-            renameInput.addEventListener('keydown', (e) => {
+            renameInput.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     saveRename();
@@ -577,14 +711,23 @@
             });
 
             loadFromURL();
+
             document.getElementById('copy-clipboard').addEventListener('click', copyToClipboard);
             document.getElementById('add-curve').addEventListener('click', () => {
-                if (curves.length === 0) addCurve();
-                else {
+                if (curves.length === 0) {
+                    addCurve();
+                } else {
                     const last = curves[curves.length - 1];
-                    addCurve({ x1: last.x1, y1: last.y1 - 5, x2: last.x2, y2: last.y2, name: null });
+                    addCurve({
+                        x1: last.x1, y1: last.y1,
+                        x2: last.x2, y2: last.y2 - 5,
+                        offset: last.offset,
+                        hmin: last.hmin,
+                        hmax: last.hmax
+                    });
                 }
             });
+
             document.getElementById('oat-input').addEventListener('input', e => {
                 oat = parseFloat(e.target.value);
                 calculateLWT();
@@ -596,4 +739,4 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
-</html>
+</html>l>html>l>
