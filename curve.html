@@ -554,7 +554,7 @@
 
                 const hasAdjustment = (c.offset !== 0 || c.frostBoostIdx > 0 || c.modStep !== 0);
 
-                const epsilon = 0.001;
+                const epsilon = 0.1;
 
                 let xs = [];
                 for (let t = Math.floor(displayMinX); t <= Math.ceil(displayMaxX); t++) {
@@ -663,6 +663,7 @@
                         }
                     },
                     onHover: (event, activeElements) => {
+
                         const area = chart.chartArea;
                         if (!event.native || !area) return;
                         const x = event.x, y = event.y;
@@ -671,7 +672,25 @@
                             return;
                         }
                         const xVal = chart.scales.x.getValueForPixel(x);
-                        const snapped = Math.round(xVal);
+
+                        let snapped;
+                        if (activeElements.length > 0) {
+                            let minDist = Infinity;
+                            let chosenX = null;
+                            activeElements.forEach(ae => {
+                                const px = chart.scales.x.getValueForPixel(ae.element.x);
+                                const dist = Math.abs(px - xVal);
+                                if (dist < minDist) {
+                                    minDist = dist;
+                                    chosenX = px;
+                                } else if (dist === minDist) {
+                                    if (px > chosenX) chosenX = px;  // Prefer the larger x in case of ties
+                                }
+                            });
+                            snapped = chosenX;
+                        } else {
+                            snapped = Math.round(xVal);
+                        }
                         displayCrosshair(snapped);
                     }
                 },
@@ -702,7 +721,7 @@
             }
 
             chart.options.plugins.annotation.annotations.vLine.value = oatVal;
-            chart.options.plugins.annotation.annotations.vLine.label.content = `Outdoor: ${oatVal} °C`;
+            chart.options.plugins.annotation.annotations.vLine.label.content = `Outdoor: ${oatVal.toFixed(1)} °C`;
             chart.options.plugins.annotation.annotations.vLine.label.display = true;
 
             curves.forEach((c, i) => {
