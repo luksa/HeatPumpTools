@@ -143,7 +143,7 @@
         let currentRenameIndex = -1;
 
         const frostBoostPresets = [
-            { label: "None",                       increase: 0,   span: 0   },
+            { label: "None",              increase: 0,   span: 0   },
             { label: "2°C, span 4°C",     increase: 2,   span: 4   },
             { label: "4°C, span 4°C",     increase: 4,   span: 4   },
             { label: "2°C, span 8°C",     increase: 2,   span: 8   },
@@ -359,7 +359,6 @@
                 tabContent.appendChild(pane);
             });
 
-            // Re-attach listeners — important!
             document.querySelectorAll('input[type="number"], select.frost-boost').forEach(el => {
                 el.removeEventListener('change', updateAll);
                 el.removeEventListener('input', updateAll);
@@ -447,18 +446,11 @@
             const preset = frostBoostPresets[curve.frostBoostIdx || 0];
             if (!preset || preset.increase <= 0 || preset.span <= 0) return 0;
             const half = preset.span / 2;
-            if (oat >= -half && oat < half) return preset.increase;
+            if (oat >= -half && oat <= half) return preset.increase;
             return 0;
         }
 
-        function applyOffsetAndClamp(baseLWT, offset, hmin, hmax) {
-            let lwt = baseLWT + (offset || 0);
-            if (hmin != null) lwt = Math.max(lwt, hmin);
-            if (hmax != null) lwt = Math.min(lwt, hmax);
-            return lwt;
-        }
-
-        function getLWTForCurve(curve, oat, useOffset = true, useFrost = true) {
+        function getLWTForCurve(curve, oat, useOffsets = true) {
             let points = [{x: curve.x1, y: curve.y1}, {x: curve.x2, y: curve.y2}].sort((a, b) => a.x - b.x);
             const left = points[0];
             const right = points[1];
@@ -472,8 +464,10 @@
             }
 
             let adjustment = 0;
-            if (useOffset) adjustment += curve.offset || 0;
-            if (useFrost)  adjustment += getFrostBoostAdd(curve, oat);
+            if (useOffsets) {
+                adjustment += curve.offset || 0;
+                adjustment += getFrostBoostAdd(curve, oat);
+            }
 
             let lwt = baseLWT + adjustment;
 
@@ -490,13 +484,14 @@
             let allX = [], allBaseY = [], allOffsetY = [];
             curves.forEach(c => {
                 allX.push(c.x1, c.x2);
-                const baseMin = Math.min(c.y1, c.y2);
-                const baseMax = Math.max(c.y1, c.y2);
-                allBaseY.push(baseMin, baseMax);
 
-                const offMin = getLWTForCurve(c, Math.min(c.x1, c.x2), true, true);
-                const offMax = getLWTForCurve(c, Math.max(c.x1, c.x2), true, true);
-                allOffsetY.push(offMin, offMax);
+                const baseY1 = getLWTForCurve(c, c.x1, false);
+                const baseY2 = getLWTForCurve(c, c.x2, false);
+                allBaseY.push(baseY1, baseY2);
+
+                const offsetY1 = getLWTForCurve(c, c.x1, true);
+                const offsetY2 = getLWTForCurve(c, c.x2, true);
+                allOffsetY.push(offsetY1, offsetY2);
             });
 
             const minX = allX.length ? Math.min(...allX) : DEFAULT_MIN_X;
@@ -520,45 +515,43 @@
                 const left  = points[0];
                 const right = points[1];
 
-                const dataOffset = [];
-                for (let t = displayMinX; t <= Math.floor(left.x); t++) {
-                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true, true)});
+                const hasAdjustment = c.offset !== 0 || c.frostBoostIdx > 0;
+
+                const epsilon = 0.001;
+
+                let xs = [];
+                for (let t = Math.floor(displayMinX); t <= Math.ceil(displayMaxX); t++) {
+                    xs.push(t);
                 }
-                dataOffset.push({x: left.x, y: getLWTForCurve(c, left.x, true, true)});
-                for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) {
-                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true, true)});
-                }
-                dataOffset.push({x: right.x, y: getLWTForCurve(c, right.x, true, true)});
-                for (let t = Math.ceil(right.x); t <= displayMaxX; t++) {
-                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true, true)});
+                xs.push(left.x, right.x);
+
+                const preset = frostBoostPresets[c.frostBoostIdx || 0];
+                if (preset && preset.increase > 0) {
+                    const half = preset.span / 2;
+                    const start = -half;
+                    const end = half;
+                    xs.push(start - epsilon, start, end, end + epsilon);
                 }
 
+                xs = [...new Set(xs)].sort((a, b) => a - b);
+
+                const dataOffset = xs.map(x => ({x: x, y: getLWTForCurve(c, x, true)}));
+
                 datasets.push({
-                    label: (c.offset !== 0 || c.frostBoostIdx > 0) ? `${c.name} (adjusted)` : `${c.name}`,
+                    label: hasAdjustment ? `${c.name} (adjusted)` : `${c.name}`,
                     data: dataOffset,
                     borderColor: baseColor,
                     backgroundColor: baseColor,
                     borderWidth: 3,
-                    pointRadius: ctx => {
+                    pointRadius: hasAdjustment ? 0 : ctx => {
                         const x = ctx.parsed.x;
-                        return (Math.abs(x - Math.round(left.x)) < 0.1 || Math.abs(x - Math.round(right.x)) < 0.1) ? 6 : 0;
+                        return (Math.abs(x - left.x) < epsilon || Math.abs(x - right.x) < epsilon) ? 6 : 0;
                     },
                     tension: 0
                 });
 
-                if (c.offset !== 0 || c.frostBoostIdx > 0) {
-                    const dataBase = [];
-                    for (let t = displayMinX; t <= Math.floor(left.x); t++) {
-                        dataBase.push({x: t, y: getLWTForCurve(c, t, false, false)});
-                    }
-                    dataBase.push({x: left.x, y: getLWTForCurve(c, left.x, false, false)});
-                    for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) {
-                        dataBase.push({x: t, y: getLWTForCurve(c, t, false, false)});
-                    }
-                    dataBase.push({x: right.x, y: getLWTForCurve(c, right.x, false, false)});
-                    for (let t = Math.ceil(right.x); t <= displayMaxX; t++) {
-                        dataBase.push({x: t, y: getLWTForCurve(c, t, false, false)});
-                    }
+                if (hasAdjustment) {
+                    const dataBase = xs.map(x => ({x: x, y: getLWTForCurve(c, x, false)}));
 
                     datasets.push({
                         label: `${c.name} (base)`,
@@ -569,7 +562,11 @@
                         borderDash: [4, 3],
                         pointRadius: ctx => {
                             const x = ctx.parsed.x;
-                            return (Math.abs(x - Math.round(left.x)) < 0.1 || Math.abs(x - Math.round(right.x)) < 0.1) ? 6 : 0;
+                            return (Math.abs(x - left.x) < epsilon || Math.abs(x - right.x) < epsilon) ? 6 : 0;
+                        },
+                        pointHoverRadius: ctx => {
+                            const x = ctx.parsed.x;
+                            return (Math.abs(x - left.x) < epsilon || Math.abs(x - right.x) < epsilon) ? 6 : 0;
                         },
                         tension: 0
                     });
@@ -672,7 +669,7 @@
             chart.options.plugins.annotation.annotations.vLine.label.display = true;
 
             curves.forEach((c, i) => {
-                const lwt = getLWTForCurve(c, oatVal, true, true);
+                const lwt = getLWTForCurve(c, oatVal, true);
                 const rounded = Math.round(lwt * 10) / 10;
                 const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
                 h.value = rounded;
@@ -776,7 +773,7 @@
             if (isNaN(oat)) return;
 
             curves.forEach(c => {
-                const lwt = getLWTForCurve(c, oat, true, true);
+                const lwt = getLWTForCurve(c, oat, true);
                 const p = document.createElement('p');
                 p.textContent = `${c.name}: LWT = ${lwt.toFixed(1)} °C`;
                 container.appendChild(p);
@@ -807,7 +804,7 @@
                     addCurve({
                         x1: last.x1, y1: last.y1,
                         x2: last.x2, y2: last.y2 - 5,
-                        offset: last.offset,
+                        offset: last.offset,	
                         hmin: last.hmin,
                         hmax: last.hmax,
                         frostBoostIdx: last.frostBoostIdx
