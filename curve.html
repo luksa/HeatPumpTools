@@ -189,22 +189,32 @@
         }
 
         function validateCurve(curve, pane) {
-            const offsetInput = pane.querySelector('.offset');
-            const y1Input     = pane.querySelector('.y1');
-            const y2Input     = pane.querySelector('.y2');
-            const hminInput   = pane.querySelector('.hmin');
-            const hmaxInput   = pane.querySelector('.hmax');
+            const offsetInput    = pane.querySelector('.offset');
+            const modStepInput   = pane.querySelector('.mod-step');
+            const maxModInput    = pane.querySelector('.max-mod');
+            const y1Input        = pane.querySelector('.y1');
+            const y2Input        = pane.querySelector('.y2');
+            const hminInput      = pane.querySelector('.hmin');
+            const hmaxInput      = pane.querySelector('.hmax');
 
             clearInvalid(offsetInput);
+            clearInvalid(modStepInput);
+            clearInvalid(maxModInput);
             clearInvalid(y1Input);
             clearInvalid(y2Input);
 
-            const offset = getNumber(offsetInput.value, 0);
-            const hmin   = getNumber(hminInput.value, null);
-            const hmax   = getNumber(hmaxInput.value, null);
+            const offset   = getNumber(offsetInput.value, 0);
+            const modStep  = getNumber(modStepInput.value, 0);
+            const maxMod   = getNumber(maxModInput.value, null);
+            const hmin     = getNumber(hminInput.value, null);
+            const hmax     = getNumber(hmaxInput.value, null);
 
             if (offset !== 0 && (hmin === null || hmax === null)) {
                 markInvalid(offsetInput, 'Please enter the heating minimum and maximum to display the curve correctly.');
+            }
+
+            if (modStep !== 0 && maxMod === null) {
+                markInvalid(modStepInput, 'Please set Max modulation when using a non-zero modulation step.');
             }
 
             if (hmin !== null || hmax !== null) {
@@ -316,10 +326,18 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row align-items-center mb-2">
+                            <label class="col-sm-7 col-form-label text-sm-end">Modulation step</label>
+                            <div class="col-sm-5">
+                                <div class="input-group has-validation">
+                                    <input type="number" class="form-control narrow-input mod-step" value="${curve.modStep ?? 0}" step="1" min="-4" max="4">
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-4">
-                        <h6 class="fw-bold">Space heating settings</h6>
+                        <h6 class="fw-bold">Space Heating Settings</h6>
                         <div class="row align-items-center mb-2">
                             <label class="col-sm-7 col-form-label text-sm-end">Heating Minimum</label>
                             <div class="col-sm-5">
@@ -334,6 +352,15 @@
                             <div class="col-sm-5">
                                 <div class="input-group">
                                     <input type="number" class="form-control narrow-input hmax" value="${curve.hmax ?? ''}" placeholder="—" step="1">
+                                    <span class="input-group-text">°C</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row align-items-center mb-2">
+                            <label class="col-sm-7 col-form-label text-sm-end">Max modulation</label>
+                            <div class="col-sm-5">
+                                <div class="input-group has-validation">
+                                    <input type="number" class="form-control narrow-input max-mod" value="${curve.maxMod ?? ''}" placeholder="—" step="1" min="0">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -387,8 +414,8 @@
 
         function addCurve(data = {
             x1: -5, y1: 45, x2: 20, y2: 25,
-            name: null, offset: 0, hmin: null, hmax: null,
-            frostBoostIdx: 0
+            name: null, offset: 0, modStep: 0, maxMod: 5,
+            hmin: null, hmax: null, frostBoostIdx: 0
         }) {
             const defaultName = `Curve ${curves.length + 1}`;
             curves.push({
@@ -398,6 +425,8 @@
                 y2: data.y2,
                 name: data.name || defaultName,
                 offset: data.offset ?? 0,
+                modStep: data.modStep ?? 0,
+                maxMod: data.maxMod ?? null,
                 hmin: data.hmin ?? null,
                 hmax: data.hmax ?? null,
                 frostBoostIdx: data.frostBoostIdx ?? 0
@@ -424,14 +453,16 @@
 
             const curve = curves[index];
 
-            curve.y1 = getNumber(activePane.querySelector('.y1')?.value, curve.y1);
-            curve.x1 = getNumber(activePane.querySelector('.x1')?.value, curve.x1);
-            curve.y2 = getNumber(activePane.querySelector('.y2')?.value, curve.y2);
-            curve.x2 = getNumber(activePane.querySelector('.x2')?.value, curve.x2);
+            curve.y1     = getNumber(activePane.querySelector('.y1')?.value, curve.y1);
+            curve.x1     = getNumber(activePane.querySelector('.x1')?.value, curve.x1);
+            curve.y2     = getNumber(activePane.querySelector('.y2')?.value, curve.y2);
+            curve.x2     = getNumber(activePane.querySelector('.x2')?.value, curve.x2);
 
-            curve.offset       = getNumber(activePane.querySelector('.offset')?.value, 0);
-            curve.hmin         = getNumber(activePane.querySelector('.hmin')?.value, null);
-            curve.hmax         = getNumber(activePane.querySelector('.hmax')?.value, null);
+            curve.offset    = getNumber(activePane.querySelector('.offset')?.value, 0);
+            curve.modStep   = getNumber(activePane.querySelector('.mod-step')?.value, 0);
+            curve.maxMod    = getNumber(activePane.querySelector('.max-mod')?.value, null);
+            curve.hmin      = getNumber(activePane.querySelector('.hmin')?.value, null);
+            curve.hmax      = getNumber(activePane.querySelector('.hmax')?.value, null);
             curve.frostBoostIdx = getNumber(activePane.querySelector('.frost-boost')?.value, 0);
 
             validateCurve(curve, activePane);
@@ -448,6 +479,11 @@
             const half = preset.span / 2;
             if (oat >= -half && oat <= half) return preset.increase;
             return 0;
+        }
+
+        function getModulationOffset(curve) {
+            if (curve.maxMod == null || curve.modStep == null) return 0;
+            return (curve.maxMod / 4) * curve.modStep;
         }
 
         function getLWTForCurve(curve, oat, useOffsets = true) {
@@ -467,6 +503,7 @@
             if (useOffsets) {
                 adjustment += curve.offset || 0;
                 adjustment += getFrostBoostAdd(curve, oat);
+                adjustment += getModulationOffset(curve);
             }
 
             let lwt = baseLWT + adjustment;
@@ -515,7 +552,7 @@
                 const left  = points[0];
                 const right = points[1];
 
-                const hasAdjustment = c.offset !== 0 || c.frostBoostIdx > 0;
+                const hasAdjustment = (c.offset !== 0 || c.frostBoostIdx > 0 || c.modStep !== 0);
 
                 const epsilon = 0.001;
 
@@ -684,9 +721,11 @@
             const parts = [];
             curves.forEach((c, i) => {
                 let curveStr = `${c.x1}${SEPARATOR}${c.y1}${SEPARATOR}${c.x2}${SEPARATOR}${c.y2}`;
-                const hasExtra = c.offset !== 0 || c.hmin != null || c.hmax != null || c.frostBoostIdx > 0;
+                const hasExtra = c.offset !== 0 || c.modStep !== 0 || c.maxMod != null || c.hmin != null || c.hmax != null || c.frostBoostIdx > 0;
                 if (hasExtra) {
                     curveStr += `${SEPARATOR}${c.offset}`;
+                    curveStr += `${SEPARATOR}${c.modStep}`;
+                    curveStr += `${SEPARATOR}${c.maxMod ?? ''}`;
                     curveStr += `${SEPARATOR}${c.hmin ?? ''}${SEPARATOR}${c.hmax ?? ''}${SEPARATOR}${c.frostBoostIdx ?? 0}`;
                 }
                 parts.push(`curve${i+1}=${curveStr}`);
@@ -744,20 +783,22 @@
 
                 if ([x1,y1,x2,y2].some(isNaN)) continue;
 
-                let offset = 0, hmin = null, hmax = null, frostBoostIdx = 0;
-                if (rest.length >= 1) offset = parseFloat(rest[0]) || 0;
-                if (rest.length >= 3) {
-                    hmin = rest[1] ? parseFloat(rest[1]) : null;
-                    hmax = rest[2] ? parseFloat(rest[2]) : null;
+                let offset = 0, modStep = 0, maxMod = null, hmin = null, hmax = null, frostBoostIdx = 0;
+                if (rest.length >= 1) offset    = parseFloat(rest[0]) || 0;
+                if (rest.length >= 2) modStep   = parseFloat(rest[1]) || 0;
+                if (rest.length >= 3) maxMod    = rest[2] ? parseFloat(rest[2]) : null;
+                if (rest.length >= 5) {
+                    hmin = rest[3] ? parseFloat(rest[3]) : null;
+                    hmax = rest[4] ? parseFloat(rest[4]) : null;
                 }
-                if (rest.length >= 4) {
-                    frostBoostIdx = parseInt(rest[3]) || 0;
+                if (rest.length >= 6) {
+                    frostBoostIdx = parseInt(rest[5]) || 0;
                     if (frostBoostIdx < 0 || frostBoostIdx >= frostBoostPresets.length) frostBoostIdx = 0;
                 }
 
                 const name = params.has(`name${i}`) ? decodeURIComponent(params.get(`name${i}`)) : null;
 
-                addCurve({x1, y1, x2, y2, name, offset, hmin, hmax, frostBoostIdx});
+                addCurve({x1, y1, x2, y2, name, offset, modStep, maxMod, hmin, hmax, frostBoostIdx});
             }
 
             if (!isNaN(oat)) {
@@ -804,7 +845,9 @@
                     addCurve({
                         x1: last.x1, y1: last.y1,
                         x2: last.x2, y2: last.y2 - 5,
-                        offset: last.offset,	
+                        offset: last.offset,
+                        modStep: last.modStep,
+                        maxMod: last.maxMod,
                         hmin: last.hmin,
                         hmax: last.hmax,
                         frostBoostIdx: last.frostBoostIdx
