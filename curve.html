@@ -142,6 +142,14 @@
         let renameSave  = null;
         let currentRenameIndex = -1;
 
+        const frostBoostPresets = [
+            { label: "None",                       increase: 0,   span: 0   },
+            { label: "increase 2°C, span 4°C",     increase: 2,   span: 4   },
+            { label: "increase 4°C, span 4°C",     increase: 4,   span: 4   },
+            { label: "increase 2°C, span 8°C",     increase: 2,   span: 8   },
+            { label: "increase 4°C, span 8°C",     increase: 4,   span: 8   },
+        ];
+
         function openRenameModal(index) {
             currentRenameIndex = index;
             renameInput.value = curves[index].name;
@@ -187,7 +195,6 @@
             const hminInput   = pane.querySelector('.hmin');
             const hmaxInput   = pane.querySelector('.hmax');
 
-            // Reset
             clearInvalid(offsetInput);
             clearInvalid(y1Input);
             clearInvalid(y2Input);
@@ -196,12 +203,10 @@
             const hmin   = getNumber(hminInput.value, null);
             const hmax   = getNumber(hmaxInput.value, null);
 
-            // Offset without min+max
             if (offset !== 0 && (hmin === null || hmax === null)) {
                 markInvalid(offsetInput, 'Please enter the heating minimum and maximum to display the curve correctly.');
             }
 
-            // Base LWT points outside range
             if (hmin !== null || hmax !== null) {
                 const effMin = hmin ?? -Infinity;
                 const effMax = hmax ?? Infinity;
@@ -219,7 +224,6 @@
             input.classList.add('is-invalid');
             input.setAttribute('title', message);
             input.setAttribute('data-bs-toggle', 'tooltip');
-            //input.setAttribute('data-bs-placement', 'right');
             const tooltip = bootstrap.Tooltip.getOrCreateInstance(input, {trigger: 'hover focus'});
             tooltip.setContent({ '.tooltip-inner': message });
             tooltip.update();
@@ -230,9 +234,7 @@
             input.classList.remove('is-invalid');
             input.removeAttribute('title');
             const tooltip = bootstrap.Tooltip.getInstance(input);
-            if (tooltip) {
-                tooltip.dispose();
-            }
+            if (tooltip) tooltip.dispose();
         }
 
         function updateTabsAndContent() {
@@ -327,13 +329,25 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="row align-items-center mb-3">
+                        <div class="row align-items-center mb-2">
                             <label class="col-sm-7 col-form-label text-sm-end">Heating Maximum</label>
                             <div class="col-sm-5">
                                 <div class="input-group">
                                     <input type="number" class="form-control narrow-input hmax" value="${curve.hmax ?? ''}" placeholder="—" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="row align-items-center mb-3">
+                            <label class="col-sm-7 col-form-label text-sm-end">Increase around 0°C</label>
+                            <div class="col-sm-5">
+                                <select class="form-select frost-boost">
+                                    ${frostBoostPresets.map((p, idx) => 
+                                        `<option value="${idx}" ${curve.frostBoostIdx === idx ? 'selected' : ''}>
+                                            ${p.label}
+                                        </option>`
+                                    ).join('')}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -345,7 +359,8 @@
                 tabContent.appendChild(pane);
             });
 
-            document.querySelectorAll('input[type="number"]').forEach(el => {
+            // Re-attach listeners — important!
+            document.querySelectorAll('input[type="number"], select.frost-boost').forEach(el => {
                 el.removeEventListener('change', updateAll);
                 el.removeEventListener('input', updateAll);
                 el.addEventListener('change', updateAll);
@@ -365,14 +380,17 @@
 
             updateRemoveButtons();
 
-            // Validate all curves
             curves.forEach((curve, i) => {
                 const pane = document.getElementById(`curve-tab-${i}`);
                 if (pane) validateCurve(curve, pane);
             });
         }
 
-        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null, offset: 0, hmin: null, hmax: null}) {
+        function addCurve(data = {
+            x1: -5, y1: 45, x2: 20, y2: 25,
+            name: null, offset: 0, hmin: null, hmax: null,
+            frostBoostIdx: 0
+        }) {
             const defaultName = `Curve ${curves.length + 1}`;
             curves.push({
                 x1: data.x1,
@@ -382,7 +400,8 @@
                 name: data.name || defaultName,
                 offset: data.offset ?? 0,
                 hmin: data.hmin ?? null,
-                hmax: data.hmax ?? null
+                hmax: data.hmax ?? null,
+                frostBoostIdx: data.frostBoostIdx ?? 0
             });
             updateTabsAndContent();
             updateAll();
@@ -411,9 +430,10 @@
             curve.y2 = getNumber(activePane.querySelector('.y2')?.value, curve.y2);
             curve.x2 = getNumber(activePane.querySelector('.x2')?.value, curve.x2);
 
-            curve.offset = getNumber(activePane.querySelector('.offset')?.value, 0);
-            curve.hmin   = getNumber(activePane.querySelector('.hmin')?.value, null);
-            curve.hmax   = getNumber(activePane.querySelector('.hmax')?.value, null);
+            curve.offset       = getNumber(activePane.querySelector('.offset')?.value, 0);
+            curve.hmin         = getNumber(activePane.querySelector('.hmin')?.value, null);
+            curve.hmax         = getNumber(activePane.querySelector('.hmax')?.value, null);
+            curve.frostBoostIdx = getNumber(activePane.querySelector('.frost-boost')?.value, 0);
 
             validateCurve(curve, activePane);
 
@@ -423,6 +443,14 @@
             displayDefaultCrosshair();
         }
 
+        function getFrostBoostAdd(curve, oat) {
+            const preset = frostBoostPresets[curve.frostBoostIdx || 0];
+            if (!preset || preset.increase <= 0 || preset.span <= 0) return 0;
+            const half = preset.span / 2;
+            if (oat >= -half && oat < half) return preset.increase;
+            return 0;
+        }
+
         function applyOffsetAndClamp(baseLWT, offset, hmin, hmax) {
             let lwt = baseLWT + (offset || 0);
             if (hmin != null) lwt = Math.max(lwt, hmin);
@@ -430,7 +458,7 @@
             return lwt;
         }
 
-        function getLWTForCurve(curve, oat, useOffset = true) {
+        function getLWTForCurve(curve, oat, useOffset = true, useFrost = true) {
             let points = [{x: curve.x1, y: curve.y1}, {x: curve.x2, y: curve.y2}].sort((a, b) => a.x - b.x);
             const left = points[0];
             const right = points[1];
@@ -443,9 +471,16 @@
                 baseLWT = left.y + slope * (oat - left.x);
             }
 
-            return useOffset 
-                ? applyOffsetAndClamp(baseLWT, curve.offset, curve.hmin, curve.hmax)
-                : applyOffsetAndClamp(baseLWT, 0,           curve.hmin, curve.hmax);
+            let adjustment = 0;
+            if (useOffset) adjustment += curve.offset || 0;
+            if (useFrost)  adjustment += getFrostBoostAdd(curve, oat);
+
+            let lwt = baseLWT + adjustment;
+
+            if (curve.hmin != null) lwt = Math.max(lwt, curve.hmin);
+            if (curve.hmax != null) lwt = Math.min(lwt, curve.hmax);
+
+            return lwt;
         }
 
         function updateChart() {
@@ -459,8 +494,8 @@
                 const baseMax = Math.max(c.y1, c.y2);
                 allBaseY.push(baseMin, baseMax);
 
-                const offMin = applyOffsetAndClamp(baseMin, c.offset, c.hmin, c.hmax);
-                const offMax = applyOffsetAndClamp(baseMax, c.offset, c.hmin, c.hmax);
+                const offMin = getLWTForCurve(c, Math.min(c.x1, c.x2), true, true);
+                const offMax = getLWTForCurve(c, Math.max(c.x1, c.x2), true, true);
                 allOffsetY.push(offMin, offMax);
             });
 
@@ -487,46 +522,46 @@
 
                 const dataOffset = [];
                 for (let t = displayMinX; t <= Math.floor(left.x); t++) {
-                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
+                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true, true)});
                 }
-                dataOffset.push({x: left.x, y: getLWTForCurve(c, left.x, true)});
+                dataOffset.push({x: left.x, y: getLWTForCurve(c, left.x, true, true)});
                 for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) {
-                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
+                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true, true)});
                 }
-                dataOffset.push({x: right.x, y: getLWTForCurve(c, right.x, true)});
+                dataOffset.push({x: right.x, y: getLWTForCurve(c, right.x, true, true)});
                 for (let t = Math.ceil(right.x); t <= displayMaxX; t++) {
-                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
+                    dataOffset.push({x: t, y: getLWTForCurve(c, t, true, true)});
                 }
 
                 datasets.push({
-                    label: c.offset !== 0 ? `${c.name} (with offset)` : `${c.name}`,
+                    label: (c.offset !== 0 || c.frostBoostIdx > 0) ? `${c.name} (adjusted)` : `${c.name}`,
                     data: dataOffset,
                     borderColor: baseColor,
                     backgroundColor: baseColor,
                     borderWidth: 3,
-                    pointRadius: c.offset !== 0 ? 0 : ctx => {
+                    pointRadius: ctx => {
                         const x = ctx.parsed.x;
                         return (Math.abs(x - Math.round(left.x)) < 0.1 || Math.abs(x - Math.round(right.x)) < 0.1) ? 6 : 0;
                     },
                     tension: 0
                 });
 
-                if (c.offset !== 0) {
+                if (c.offset !== 0 || c.frostBoostIdx > 0) {
                     const dataBase = [];
                     for (let t = displayMinX; t <= Math.floor(left.x); t++) {
-                        dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
+                        dataBase.push({x: t, y: getLWTForCurve(c, t, false, false)});
                     }
-                    dataBase.push({x: left.x, y: getLWTForCurve(c, left.x, false)});
+                    dataBase.push({x: left.x, y: getLWTForCurve(c, left.x, false, false)});
                     for (let t = Math.ceil(left.x); t < Math.floor(right.x); t++) {
-                        dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
+                        dataBase.push({x: t, y: getLWTForCurve(c, t, false, false)});
                     }
-                    dataBase.push({x: right.x, y: getLWTForCurve(c, right.x, false)});
+                    dataBase.push({x: right.x, y: getLWTForCurve(c, right.x, false, false)});
                     for (let t = Math.ceil(right.x); t <= displayMaxX; t++) {
-                        dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
+                        dataBase.push({x: t, y: getLWTForCurve(c, t, false, false)});
                     }
 
                     datasets.push({
-                        label: `${c.name} (w/o offset)`,
+                        label: `${c.name} (base)`,
                         data: dataBase,
                         borderColor: dimColor,
                         backgroundColor: dimColor,
@@ -637,7 +672,7 @@
             chart.options.plugins.annotation.annotations.vLine.label.display = true;
 
             curves.forEach((c, i) => {
-                const lwt = getLWTForCurve(c, oatVal, true);
+                const lwt = getLWTForCurve(c, oatVal, true, true);
                 const rounded = Math.round(lwt * 10) / 10;
                 const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
                 h.value = rounded;
@@ -652,11 +687,10 @@
             const parts = [];
             curves.forEach((c, i) => {
                 let curveStr = `${c.x1}${SEPARATOR}${c.y1}${SEPARATOR}${c.x2}${SEPARATOR}${c.y2}`;
-                if (c.offset !== 0 || c.hmin != null || c.hmax != null) {
+                const hasExtra = c.offset !== 0 || c.hmin != null || c.hmax != null || c.frostBoostIdx > 0;
+                if (hasExtra) {
                     curveStr += `${SEPARATOR}${c.offset}`;
-                    if (c.hmin != null || c.hmax != null) {
-                        curveStr += `${SEPARATOR}${c.hmin ?? ''}${SEPARATOR}${c.hmax ?? ''}`;
-                    }
+                    curveStr += `${SEPARATOR}${c.hmin ?? ''}${SEPARATOR}${c.hmax ?? ''}${SEPARATOR}${c.frostBoostIdx ?? 0}`;
                 }
                 parts.push(`curve${i+1}=${curveStr}`);
                 parts.push(`name${i+1}=${encodeURIComponent(c.name)}`);
@@ -713,16 +747,20 @@
 
                 if ([x1,y1,x2,y2].some(isNaN)) continue;
 
-                let offset = 0, hmin = null, hmax = null;
+                let offset = 0, hmin = null, hmax = null, frostBoostIdx = 0;
                 if (rest.length >= 1) offset = parseFloat(rest[0]) || 0;
                 if (rest.length >= 3) {
                     hmin = rest[1] ? parseFloat(rest[1]) : null;
                     hmax = rest[2] ? parseFloat(rest[2]) : null;
                 }
+                if (rest.length >= 4) {
+                    frostBoostIdx = parseInt(rest[3]) || 0;
+                    if (frostBoostIdx < 0 || frostBoostIdx >= frostBoostPresets.length) frostBoostIdx = 0;
+                }
 
                 const name = params.has(`name${i}`) ? decodeURIComponent(params.get(`name${i}`)) : null;
 
-                addCurve({x1, y1, x2, y2, name, offset, hmin, hmax});
+                addCurve({x1, y1, x2, y2, name, offset, hmin, hmax, frostBoostIdx});
             }
 
             if (!isNaN(oat)) {
@@ -738,7 +776,7 @@
             if (isNaN(oat)) return;
 
             curves.forEach(c => {
-                const lwt = getLWTForCurve(c, oat, true);
+                const lwt = getLWTForCurve(c, oat, true, true);
                 const p = document.createElement('p');
                 p.textContent = `${c.name}: LWT = ${lwt.toFixed(1)} °C`;
                 container.appendChild(p);
@@ -769,9 +807,10 @@
                     addCurve({
                         x1: last.x1, y1: last.y1,
                         x2: last.x2, y2: last.y2 - 5,
-                        offset: 0,
+                        offset: last.offset,
                         hmin: last.hmin,
-                        hmax: last.hmax
+                        hmax: last.hmax,
+                        frostBoostIdx: last.frostBoostIdx
                     });
                 }
             });
