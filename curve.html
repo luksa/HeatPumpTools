@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weather Dependent Heating Curve Visualizer</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="bootstrap-custom.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -180,6 +180,61 @@
             });
         }
 
+        function validateCurve(curve, pane) {
+            const offsetInput = pane.querySelector('.offset');
+            const y1Input     = pane.querySelector('.y1');
+            const y2Input     = pane.querySelector('.y2');
+            const hminInput   = pane.querySelector('.hmin');
+            const hmaxInput   = pane.querySelector('.hmax');
+
+            // Reset
+            clearInvalid(offsetInput);
+            clearInvalid(y1Input);
+            clearInvalid(y2Input);
+
+            const offset = getNumber(offsetInput.value, 0);
+            const hmin   = getNumber(hminInput.value, null);
+            const hmax   = getNumber(hmaxInput.value, null);
+
+            // Offset without min+max
+            if (offset !== 0 && (hmin === null || hmax === null)) {
+                markInvalid(offsetInput, 'Please enter the heating minimum and maximum to display the curve correctly.');
+            }
+
+            // Base LWT points outside range
+            if (hmin !== null || hmax !== null) {
+                const effMin = hmin ?? -Infinity;
+                const effMax = hmax ?? Infinity;
+
+                if (curve.y1 < effMin || curve.y1 > effMax) {
+                    markInvalid(y1Input, 'Leaving water temperature must be within Heating Minimum/Maximum set below.');
+                }
+                if (curve.y2 < effMin || curve.y2 > effMax) {
+                    markInvalid(y2Input, 'Leaving water temperature must be within Heating Minimum/Maximum set below.');
+                }
+            }
+        }
+
+        function markInvalid(input, message) {
+            input.classList.add('is-invalid');
+            input.setAttribute('title', message);
+            input.setAttribute('data-bs-toggle', 'tooltip');
+            //input.setAttribute('data-bs-placement', 'right');
+            const tooltip = bootstrap.Tooltip.getOrCreateInstance(input, {trigger: 'hover focus'});
+            tooltip.setContent({ '.tooltip-inner': message });
+            tooltip.update();
+            tooltip.show();
+        }
+
+        function clearInvalid(input) {
+            input.classList.remove('is-invalid');
+            input.removeAttribute('title');
+            const tooltip = bootstrap.Tooltip.getInstance(input);
+            if (tooltip) {
+                tooltip.dispose();
+            }
+        }
+
         function updateTabsAndContent() {
             const tabList = document.getElementById('curveTabs');
             const tabContent = document.getElementById('curveTabContent');
@@ -210,7 +265,7 @@
                         <div class="row align-items-center">
                             <label class="col-sm-7 col-form-label text-sm-end">Leaving Water Temp</label>
                             <div class="col-sm-5">
-                                <div class="input-group">
+                                <div class="input-group has-validation">
                                     <input type="number" class="form-control narrow-input y1" value="${curve.y1}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
@@ -231,7 +286,7 @@
                         <div class="row align-items-center">
                             <label class="col-sm-7 col-form-label text-sm-end">Leaving Water Temp</label>
                             <div class="col-sm-5">
-                                <div class="input-group">
+                                <div class="input-group has-validation">
                                     <input type="number" class="form-control narrow-input y2" value="${curve.y2}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
@@ -251,9 +306,9 @@
                     <div class="mb-4">
                         <h6 class="fw-bold">Adjustments</h6>
                         <div class="row align-items-center mb-2">
-                            <label class="col-sm-7 col-form-label text-sm-end">Offset</label>
+                            <label class="col-sm-7 col-form-label text-sm-end">Manual LWT offset</label>
                             <div class="col-sm-5">
-                                <div class="input-group">
+                                <div class="input-group has-validation">
                                     <input type="number" class="form-control narrow-input offset" value="${curve.offset ?? 0}" step="1">
                                     <span class="input-group-text">°C</span>
                                 </div>
@@ -309,6 +364,12 @@
             });
 
             updateRemoveButtons();
+
+            // Validate all curves
+            curves.forEach((curve, i) => {
+                const pane = document.getElementById(`curve-tab-${i}`);
+                if (pane) validateCurve(curve, pane);
+            });
         }
 
         function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null, offset: 0, hmin: null, hmax: null}) {
@@ -353,6 +414,8 @@
             curve.offset = getNumber(activePane.querySelector('.offset')?.value, 0);
             curve.hmin   = getNumber(activePane.querySelector('.hmin')?.value, null);
             curve.hmax   = getNumber(activePane.querySelector('.hmax')?.value, null);
+
+            validateCurve(curve, activePane);
 
             updateChart();
             updateURL();
@@ -422,9 +485,6 @@
                 const left  = points[0];
                 const right = points[1];
 
-                // ───────────────────────────────────────────────
-                //  Offset curve — always shown
-                // ───────────────────────────────────────────────
                 const dataOffset = [];
                 for (let t = displayMinX; t <= Math.floor(left.x); t++) {
                     dataOffset.push({x: t, y: getLWTForCurve(c, t, true)});
@@ -451,9 +511,6 @@
                     tension: 0
                 });
 
-                // ───────────────────────────────────────────────
-                //  Unoffset curve — shown only when offset is non-zero
-                // ───────────────────────────────────────────────
                 if (c.offset !== 0) {
                     const dataBase = [];
                     for (let t = displayMinX; t <= Math.floor(left.x); t++) {
