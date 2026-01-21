@@ -259,12 +259,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input show-unoffset" type="checkbox" id="show-unoffset-${i}" ${curve.showUnoffset ? 'checked' : ''}>
-                            <label class="form-check-label" for="show-unoffset-${i}">
-                                Show unoffset curve
-                            </label>
-                        </div>
                     </div>
 
                     <div class="mb-4">
@@ -296,8 +290,7 @@
                 tabContent.appendChild(pane);
             });
 
-            // Re-attach listeners
-            document.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(el => {
+            document.querySelectorAll('input[type="number"]').forEach(el => {
                 el.removeEventListener('change', updateAll);
                 el.removeEventListener('input', updateAll);
                 el.addEventListener('change', updateAll);
@@ -318,7 +311,7 @@
             updateRemoveButtons();
         }
 
-        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null, offset: 0, hmin: null, hmax: null, showUnoffset: false}) {
+        function addCurve(data = {x1: -5, y1: 45, x2: 20, y2: 25, name: null, offset: 0, hmin: null, hmax: null}) {
             const defaultName = `Curve ${curves.length + 1}`;
             curves.push({
                 x1: data.x1,
@@ -328,8 +321,7 @@
                 name: data.name || defaultName,
                 offset: data.offset ?? 0,
                 hmin: data.hmin ?? null,
-                hmax: data.hmax ?? null,
-                showUnoffset: !!data.showUnoffset
+                hmax: data.hmax ?? null
             });
             updateTabsAndContent();
             updateAll();
@@ -358,10 +350,9 @@
             curve.y2 = getNumber(activePane.querySelector('.y2')?.value, curve.y2);
             curve.x2 = getNumber(activePane.querySelector('.x2')?.value, curve.x2);
 
-            curve.offset      = getNumber(activePane.querySelector('.offset')?.value, 0);
-            curve.hmin        = getNumber(activePane.querySelector('.hmin')?.value, null);
-            curve.hmax        = getNumber(activePane.querySelector('.hmax')?.value, null);
-            curve.showUnoffset = activePane.querySelector('.show-unoffset')?.checked ?? false;
+            curve.offset = getNumber(activePane.querySelector('.offset')?.value, 0);
+            curve.hmin   = getNumber(activePane.querySelector('.hmin')?.value, null);
+            curve.hmax   = getNumber(activePane.querySelector('.hmax')?.value, null);
 
             updateChart();
             updateURL();
@@ -432,7 +423,7 @@
                 const right = points[1];
 
                 // ───────────────────────────────────────────────
-                //  Offset curve (always shown)
+                //  Offset curve — always shown
                 // ───────────────────────────────────────────────
                 const dataOffset = [];
                 for (let t = displayMinX; t <= Math.floor(left.x); t++) {
@@ -448,19 +439,22 @@
                 }
 
                 datasets.push({
-                    label: `${c.name} (with offset)`,
+                    label: c.offset !== 0 ? `${c.name} (with offset)` : `${c.name}`,
                     data: dataOffset,
                     borderColor: baseColor,
                     backgroundColor: baseColor,
                     borderWidth: 3,
-                    pointRadius: 0,
+                    pointRadius: c.offset !== 0 ? 0 : ctx => {
+                        const x = ctx.parsed.x;
+                        return (Math.abs(x - Math.round(left.x)) < 0.1 || Math.abs(x - Math.round(right.x)) < 0.1) ? 6 : 0;
+                    },
                     tension: 0
                 });
 
                 // ───────────────────────────────────────────────
-                //  Unoffset curve (optional)
+                //  Unoffset curve — shown only when offset is non-zero
                 // ───────────────────────────────────────────────
-                if (c.showUnoffset) {
+                if (c.offset !== 0) {
                     const dataBase = [];
                     for (let t = displayMinX; t <= Math.floor(left.x); t++) {
                         dataBase.push({x: t, y: getLWTForCurve(c, t, false)});
@@ -480,10 +474,10 @@
                         borderColor: dimColor,
                         backgroundColor: dimColor,
                         borderWidth: 2,
-                        borderDash: [3, 3],
+                        borderDash: [4, 3],
                         pointRadius: ctx => {
                             const x = ctx.parsed.x;
-                            return (x === Math.round(left.x) || x === Math.round(right.x)) ? 6 : 0;
+                            return (Math.abs(x - Math.round(left.x)) < 0.1 || Math.abs(x - Math.round(right.x)) < 0.1) ? 6 : 0;
                         },
                         tension: 0
                     });
@@ -502,7 +496,6 @@
                 }
             };
 
-            // One horizontal line per *logical* curve → points to the **offset** value
             curves.forEach((c, i) => {
                 const hue = i * 137 % 360;
                 baseAnnotations[`hLine${i}`] = {
@@ -587,7 +580,7 @@
             chart.options.plugins.annotation.annotations.vLine.label.display = true;
 
             curves.forEach((c, i) => {
-                const lwt = getLWTForCurve(c, oatVal, true); // always show offset value in crosshair
+                const lwt = getLWTForCurve(c, oatVal, true);
                 const rounded = Math.round(lwt * 10) / 10;
                 const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
                 h.value = rounded;
@@ -610,7 +603,6 @@
                 }
                 parts.push(`curve${i+1}=${curveStr}`);
                 parts.push(`name${i+1}=${encodeURIComponent(c.name)}`);
-                if (c.showUnoffset) parts.push(`unoffset${i+1}=1`);
             });
             if (!isNaN(oat)) parts.push(`oat=${oat}`);
 
@@ -672,9 +664,8 @@
                 }
 
                 const name = params.has(`name${i}`) ? decodeURIComponent(params.get(`name${i}`)) : null;
-                const showUnoffset = params.has(`unoffset${i}`) && params.get(`unoffset${i}`) === '1';
 
-                addCurve({x1, y1, x2, y2, name, offset, hmin, hmax, showUnoffset});
+                addCurve({x1, y1, x2, y2, name, offset, hmin, hmax});
             }
 
             if (!isNaN(oat)) {
@@ -721,7 +712,7 @@
                     addCurve({
                         x1: last.x1, y1: last.y1,
                         x2: last.x2, y2: last.y2 - 5,
-                        offset: last.offset,
+                        offset: 0,
                         hmin: last.hmin,
                         hmax: last.hmax
                     });
@@ -739,4 +730,4 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
-</html>l>html>l>
+</html>
