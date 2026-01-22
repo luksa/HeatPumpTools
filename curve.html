@@ -165,6 +165,7 @@
         let showBaseCurve = false;
         let showFinalLWT = false;
         let showModulation = false;
+        let displayingDefaultCrossHair = false;
 
         const frostBoostPresets = [
             { label: "None",              increase: 0,   span: 0   },
@@ -454,6 +455,10 @@
             return isNaN(n) ? def : n;
         }
 
+        function isEqual(val1, val2) {
+            return Math.abs(val1 - val2) < epsilon;
+        }
+
         function updateAll() {
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
@@ -604,11 +609,12 @@
                         tension: 0,
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            return (Math.abs(xVal - c.x1) < epsilon || Math.abs(xVal - c.x2) < epsilon) ? 6 : 0;
+                            if (displayingDefaultCrossHair && oat && isEqual(xVal, oat)) return 3;
+                            return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 6 : 0;
                         },
                         hoverRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            return (Math.abs(xVal - c.x1) < epsilon || Math.abs(xVal - c.x2) < epsilon) ? 7 : 4;
+                            return (isEqual(xVal - c.x1) || isEqual(xVal, c.x2)) ? 7 : 4;
                         }
                     });
                 }
@@ -622,7 +628,11 @@
                         borderWidth: 2,
                         borderDash: [],
                         tension: 0,
-                        pointRadius: 0
+                        pointRadius: ctx => {
+                            const xVal = ctx.parsed.x;
+                            return (displayingDefaultCrossHair && oat && isEqual(xVal, oat)) ? 3.5 : 0;
+                        },
+                        hoverRadius: 4
                     });
                 }
 
@@ -633,11 +643,14 @@
                             label: modStep == 2 ? `Modulation` : `Hidden in legend`,
                             data: xs.map(x => ({x, y: getLWTForCurve(c, x, true, true, modStep)})),
                             borderColor: modulationColors[Math.abs(modStep)],
-                            backgroundColor: modulationColors[Math.abs(modStep)],
+                            backgroundColor: baseColor,
                             borderWidth: 1,
                             borderDash: [],
                             tension: 0,
-                            pointRadius: 0,
+                            pointRadius: modStep != MOD_STEPS ? 0 : ctx => {
+                                const xVal = ctx.parsed.x;
+                                return (displayingDefaultCrossHair && oat && isEqual(xVal, oat)) ? 4 : 0;
+                            },
                             hoverRadius: modStep == MOD_STEPS ? 4 : 0
                         });
                     }
@@ -742,6 +755,7 @@
                             displayDefaultCrosshair();
                             return;
                         }
+                        displayingDefaultCrossHair = false;
                         const xVal = chart.scales.x.getValueForPixel(x);
 
                         let snapped;
@@ -775,6 +789,7 @@
         }
 
         function displayDefaultCrosshair() {
+            displayingDefaultCrossHair = true;
             displayCrosshair(oat);
         }
 
