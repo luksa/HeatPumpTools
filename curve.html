@@ -800,7 +800,7 @@
 
             curves.forEach((c, i) => {
                 if (showBaseCurve) {
-                    let lwt = getLWTForCurve(c, oatVal, true);
+                    let lwt = getLWTForCurve(c, oatVal);
                     let rounded = Math.round(lwt * 10) / 10;
                     let h = chart.options.plugins.annotation.annotations[`hLine${i}_base`];
                     h.value = rounded;
