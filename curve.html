@@ -66,13 +66,13 @@
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" id="show-base-curve">
                         <label class="form-check-label" for="show-base-curve">
-                            Base curve
+                            Curve LWT
                         </label>
                     </div>
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" id="show-final-lwt">
                         <label class="form-check-label" for="show-final-lwt">
-                            Curve with offset
+                            Target LWT
                         </label>
                     </div>
                     <div class="form-check form-check-inline">
@@ -88,16 +88,14 @@
                 <div class="card mb-4">
                     <div class="card-body">
                         <h5 class="card-title mb-3">What's my LWT at a given outdoor temperature?</h5>
-                        <div class="row lwt-row">
-                            <div class="col">
-                                <div class="input-group lwt-input-group">
-                                    <span class="input-group-text">Outdoor Temp</span>
-                                    <input id="oat-input" type="number" step="1" class="form-control narrow-input">
-                                    <span class="input-group-text">°C</span>
-                                </div>
+                        <div class="mb-3">
+                            <div class="input-group lwt-input-group">
+                                <span class="input-group-text">Outdoor Temp</span>
+                                <input id="oat-input" type="number" step="1" class="form-control narrow-input">
+                                <span class="input-group-text">°C</span>
                             </div>
-                            <div class="col" id="lwt-results"></div>
                         </div>
+                        <div id="lwt-results"></div>
                     </div>
                 </div>
              
@@ -814,7 +812,7 @@
                     rounded = Math.round(lwt * 10) / 10;
                     h = chart.options.plugins.annotation.annotations[`hLine${i}_offset`];
                     h.value = rounded;
-                    h.label.content = `${c.name} + offset: ${rounded} °C`;
+                    h.label.content = `${c.name} + offset(s): ${rounded} °C`;
                     h.label.display = true;
                 }
                 if (showModulation && c.maxMod) {
@@ -822,7 +820,7 @@
                     rounded = Math.round(lwt * 10) / 10;
                     h = chart.options.plugins.annotation.annotations[`hLine${i}_maxmod`];
                     h.value = rounded;
-                    h.label.content = `${c.name} + max mod.: ${rounded} °C`;
+                    h.label.content = `${c.name} + max mod: ${rounded} °C`;
                     h.label.display = true;
                 }
             });
@@ -943,12 +941,44 @@
             container.innerHTML = '';
             if (isNaN(oat)) return;
 
+            const table = document.createElement('table');
+            table.className = 'table table-sm mb-0';
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Curve</th>
+                        <th class="text-end">Curve LWT</th>
+                        <th class="text-end">Offset</th>
+                        <th class="text-end">0°C Increase</th>
+                        <th class="text-end">Target LWT</th>
+                        <th class="text-end">Modulated LWT</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+
+            const tbody = table.querySelector('tbody');
             curves.forEach(c => {
-                const lwt = getLWTForCurve(c, oat, true, true);
-                const p = document.createElement('p');
-                p.textContent = `${c.name}: LWT = ${lwt.toFixed(1)} °C`;
-                container.appendChild(p);
+                const baseLWT = getLWTForCurve(c, oat, false, false);
+                const offset = c.offset || 0;
+                const increaseAround0 = getFrostBoostAdd(c, oat);
+                const offsetLWT = getLWTForCurve(c, oat, true, true);
+                const maxModLWT = getLWTForCurve(c, oat, true, true, MOD_STEPS);
+                const minModLWT = getLWTForCurve(c, oat, true, true, -MOD_STEPS);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${c.name}</td>
+                    <td class="text-end">${baseLWT.toFixed(1)} °C</td>
+                    <td class="text-end">${offset > 0 ? '+' : ''}${offset} °C</td>
+                    <td class="text-end">${increaseAround0 > 0 ? '+' + increaseAround0 + ' °C' : '/'}</td>
+                    <td class="text-end fw-bold">${offsetLWT.toFixed(1)} °C</td>
+                    <td class="text-end">${minModLWT.toFixed(1)} - ${maxModLWT.toFixed(1)} °C</td>
+                `;
+                tbody.appendChild(row);
             });
+
+            container.appendChild(table);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
