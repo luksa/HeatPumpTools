@@ -152,7 +152,7 @@
         const DEFAULT_MAX_Y = 40;
         const TOP_PADDING    = 5;
         const BOTTOM_PADDING = 5;
-        const LEFT_PADDING   = 5;
+        const LEFT_PADDING   = 10;
         const RIGHT_PADDING  = 5;
         const SEPARATOR = ',';
 
@@ -607,6 +607,10 @@
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
                             return (Math.abs(xVal - c.x1) < epsilon || Math.abs(xVal - c.x2) < epsilon) ? 6 : 0;
+                        },
+                        hoverRadius: ctx => {
+                            const xVal = ctx.parsed.x;
+                            return (Math.abs(xVal - c.x1) < epsilon || Math.abs(xVal - c.x2) < epsilon) ? 7 : 4;
                         }
                     });
                 }
@@ -616,6 +620,7 @@
                         label: showBaseCurve ? "with offset" : `${c.name} with offset`,
                         data: xs.map(x => ({x, y: getLWTForCurve(c, x, true, true)})),
                         borderColor: baseColor,
+                        backgroundColor: baseColor,
                         borderWidth: 2,
                         borderDash: [],
                         tension: 0,
@@ -635,7 +640,7 @@
                             borderDash: [],
                             tension: 0,
                             pointRadius: 0,
-                            hoverRadius: 0
+                            hoverRadius: modStep == MOD_STEPS ? 4 : 0
                         });
                     }
                 }
