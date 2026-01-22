@@ -61,6 +61,28 @@
             </div>
          
             <div class="col-md-8 order-md-2">
+                <div class="d-flex gap-4">
+                    <label class="form-label">Display:</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="show-base-curve">
+                        <label class="form-check-label" for="show-base-curve">
+                            Base Curve
+                        </label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="show-final-lwt">
+                        <label class="form-check-label" for="show-final-lwt">
+                            Curve with Offsets
+                        </label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="show-modulation" disabled>
+                        <label class="form-check-label" for="show-modulation">
+                            Modulation Steps
+                        </label>
+                    </div>
+                </div>
+
                 <canvas id="chart" class="mb-4"></canvas>
              
                 <div class="card mb-4">
@@ -123,6 +145,7 @@
         let curves = [];
         let chart;
         let oat;
+        const MOD_STEPS=4;
         const DEFAULT_MIN_X = -10;
         const DEFAULT_MAX_X = 25;
         const DEFAULT_MIN_Y = 20;
@@ -141,6 +164,9 @@
         let renameInput = null;
         let renameSave  = null;
         let currentRenameIndex = -1;
+        let showBaseCurve = false;
+        let showFinalLWT = false;
+        let showModulation = false;
 
         const frostBoostPresets = [
             { label: "None",              increase: 0,   span: 0   },
@@ -149,6 +175,8 @@
             { label: "2°C, span 8°C",     increase: 2,   span: 8   },
             { label: "4°C, span 8°C",     increase: 4,   span: 8   },
         ];
+
+        const epsilon = 0.1;
 
         function openRenameModal(index) {
             currentRenameIndex = index;
@@ -190,7 +218,6 @@
 
         function validateCurve(curve, pane) {
             const offsetInput    = pane.querySelector('.offset');
-            const modStepInput   = pane.querySelector('.mod-step');
             const maxModInput    = pane.querySelector('.max-mod');
             const y1Input        = pane.querySelector('.y1');
             const y2Input        = pane.querySelector('.y2');
@@ -198,23 +225,17 @@
             const hmaxInput      = pane.querySelector('.hmax');
 
             clearInvalid(offsetInput);
-            clearInvalid(modStepInput);
             clearInvalid(maxModInput);
             clearInvalid(y1Input);
             clearInvalid(y2Input);
 
             const offset   = getNumber(offsetInput.value, 0);
-            const modStep  = getNumber(modStepInput.value, 0);
             const maxMod   = getNumber(maxModInput.value, null);
             const hmin     = getNumber(hminInput.value, null);
             const hmax     = getNumber(hmaxInput.value, null);
 
             if (offset !== 0 && (hmin === null || hmax === null)) {
                 markInvalid(offsetInput, 'Please enter the heating minimum and maximum to display the curve correctly.');
-            }
-
-            if (modStep !== 0 && maxMod === null) {
-                markInvalid(modStepInput, 'Please set Max modulation when using a non-zero modulation step.');
             }
 
             if (hmin !== null || hmax !== null) {
@@ -318,19 +339,11 @@
                     <div class="mb-4">
                         <h6 class="fw-bold">Adjustments</h6>
                         <div class="row align-items-center mb-2">
-                            <label class="col-sm-7 col-form-label text-sm-end">Manual LWT offset</label>
+                            <label class="col-sm-7 col-form-label text-sm-end">Offset</label>
                             <div class="col-sm-5">
                                 <div class="input-group has-validation">
                                     <input type="number" class="form-control narrow-input offset" value="${curve.offset ?? 0}" step="1" min="-10" max="10">
                                     <span class="input-group-text">°C</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row align-items-center mb-2">
-                            <label class="col-sm-7 col-form-label text-sm-end">Modulation step</label>
-                            <div class="col-sm-5">
-                                <div class="input-group has-validation">
-                                    <input type="number" class="form-control narrow-input mod-step" value="${curve.modStep ?? 0}" step="1" min="-4" max="4">
                                 </div>
                             </div>
                         </div>
@@ -342,7 +355,7 @@
                             <label class="col-sm-7 col-form-label text-sm-end">Heating Minimum</label>
                             <div class="col-sm-5">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input hmin" value="${curve.hmin ?? ''}" placeholder="—" step="1">
+                                    <input type="number" class="form-control narrow-input hmin" value="${curve.hmin ?? ''}" placeholder="—" step="1" min="15" max="37">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -351,16 +364,16 @@
                             <label class="col-sm-7 col-form-label text-sm-end">Heating Maximum</label>
                             <div class="col-sm-5">
                                 <div class="input-group">
-                                    <input type="number" class="form-control narrow-input hmax" value="${curve.hmax ?? ''}" placeholder="—" step="1">
+                                    <input type="number" class="form-control narrow-input hmax" value="${curve.hmax ?? ''}" placeholder="—" step="1" min="37" max="60">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
                         </div>
                         <div class="row align-items-center mb-2">
-                            <label class="col-sm-7 col-form-label text-sm-end">Max modulation</label>
+                            <label class="col-sm-7 col-form-label text-sm-end">Modulation</label>
                             <div class="col-sm-5">
                                 <div class="input-group has-validation">
-                                    <input type="number" class="form-control narrow-input max-mod" value="${curve.maxMod ?? ''}" placeholder="—" step="1" min="0">
+                                    <input type="number" class="form-control narrow-input max-mod" value="${curve.maxMod ?? ''}" placeholder="—" step="1" min="0" max="10">
                                     <span class="input-group-text">°C</span>
                                 </div>
                             </div>
@@ -414,7 +427,7 @@
 
         function addCurve(data = {
             x1: -5, y1: 45, x2: 20, y2: 25,
-            name: null, offset: 0, modStep: 0, maxMod: 5,
+            name: null, offset: 0, maxMod: 5,
             hmin: null, hmax: null, frostBoostIdx: 0
         }) {
             const defaultName = `Curve ${curves.length + 1}`;
@@ -425,7 +438,6 @@
                 y2: data.y2,
                 name: data.name || defaultName,
                 offset: data.offset ?? 0,
-                modStep: data.modStep ?? 0,
                 maxMod: data.maxMod ?? null,
                 hmin: data.hmin ?? null,
                 hmax: data.hmax ?? null,
@@ -459,7 +471,6 @@
             curve.x2     = getNumber(activePane.querySelector('.x2')?.value, curve.x2);
 
             curve.offset    = getNumber(activePane.querySelector('.offset')?.value, 0);
-            curve.modStep   = getNumber(activePane.querySelector('.mod-step')?.value, 0);
             curve.maxMod    = getNumber(activePane.querySelector('.max-mod')?.value, null);
             curve.hmin      = getNumber(activePane.querySelector('.hmin')?.value, null);
             curve.hmax      = getNumber(activePane.querySelector('.hmax')?.value, null);
@@ -481,12 +492,12 @@
             return 0;
         }
 
-        function getModulationOffset(curve) {
-            if (curve.maxMod == null || curve.modStep == null) return 0;
-            return (curve.maxMod / 4) * curve.modStep;
+        function getModulationOffset(curve, modStep = 0) {
+            if (curve.maxMod == null || modStep == null || modStep == 0) return 0;
+            return (curve.maxMod / MOD_STEPS) * modStep;
         }
 
-        function getLWTForCurve(curve, oat, useOffsets = true) {
+        function getLWTForCurve(curve, oat, addIncreaseAroundZero = false, addOffset = false, modStep = 0) {
             let points = [{x: curve.x1, y: curve.y1}, {x: curve.x2, y: curve.y2}].sort((a, b) => a.x - b.x);
             const left = points[0];
             const right = points[1];
@@ -500,11 +511,9 @@
             }
 
             let adjustment = 0;
-            if (useOffsets) {
-                adjustment += curve.offset || 0;
-                adjustment += getFrostBoostAdd(curve, oat);
-                adjustment += getModulationOffset(curve);
-            }
+            if (addIncreaseAroundZero) adjustment += getFrostBoostAdd(curve, oat);
+            if (addOffset) adjustment += curve.offset || 0;
+            adjustment += getModulationOffset(curve, modStep);
 
             let lwt = baseLWT + adjustment;
 
@@ -518,95 +527,117 @@
             if (chart) chart.destroy();
             const ctx = document.getElementById('chart').getContext('2d');
 
-            let allX = [], allBaseY = [], allOffsetY = [];
+            let allX = [];
             curves.forEach(c => {
                 allX.push(c.x1, c.x2);
-
-                const baseY1 = getLWTForCurve(c, c.x1, false);
-                const baseY2 = getLWTForCurve(c, c.x2, false);
-                allBaseY.push(baseY1, baseY2);
-
-                const offsetY1 = getLWTForCurve(c, c.x1, true);
-                const offsetY2 = getLWTForCurve(c, c.x2, true);
-                allOffsetY.push(offsetY1, offsetY2);
             });
 
             const minX = allX.length ? Math.min(...allX) : DEFAULT_MIN_X;
             const maxX = allX.length ? Math.max(...allX) : DEFAULT_MAX_X;
             const displayMinX = floorTo5(minX - LEFT_PADDING);
-            const displayMaxX = ceilTo5 (maxX + RIGHT_PADDING);
+            const displayMaxX = ceilTo5(maxX + RIGHT_PADDING);
 
-            const rawMinY = Math.min(...allBaseY, ...allOffsetY);
-            const rawMaxY = Math.max(...allBaseY, ...allOffsetY);
-            const displayMinY = floorTo5(rawMinY - BOTTOM_PADDING);
-            const displayMaxY = ceilTo5 (rawMaxY + TOP_PADDING);
+            let specialX = [];
+            curves.forEach(c => {
+                specialX.push(c.x1, c.x2);
+                if (c.frostBoostIdx > 0) {
+                    const preset = frostBoostPresets[c.frostBoostIdx];
+                    if (preset.increase > 0) {
+                        const half = preset.span / 2;
+                        specialX.push(-half - epsilon, -half, half, half + epsilon);
+                    }
+                }
+            });
+
+            let xs = [];
+            for (let t = Math.floor(displayMinX); t <= Math.ceil(displayMaxX); t++) {
+                xs.push(t);
+            }
+            xs = [...xs, ...specialX];
+            xs = [...new Set(xs)].sort((a, b) => a - b);
+
+            let allY = [];
+            let allModulationY = [];
+            curves.forEach(c => {
+                if (showBaseCurve) {
+                    xs.forEach(x => allY.push(getLWTForCurve(c, x)));
+                }
+                if (showFinalLWT) {
+                    xs.forEach(x => allY.push(getLWTForCurve(c, x, true, true)));
+                }
+                if (showModulation) {
+                    xs.forEach(x => allModulationY.push(getLWTForCurve(c, x, true, true, -MOD_STEPS)));
+                    xs.forEach(x => allModulationY.push(getLWTForCurve(c, x, true, true, MOD_STEPS)));
+                }
+            });
+
+            const rawMinY = allY.length ? Math.min(...allY) : DEFAULT_MIN_Y;
+            const rawMaxY = allY.length ? Math.max(...allY) : DEFAULT_MAX_Y;
+            const rawModulationMinY = allModulationY.length ? Math.min(...allModulationY) : Infinity;
+            const rawModulationMaxY = allModulationY.length ? Math.max(...allModulationY) : -Infinity;
+
+            const displayMinY = floorTo5(Math.min(rawMinY - BOTTOM_PADDING, rawModulationMinY));
+            const displayMaxY = ceilTo5(Math.max(rawMaxY + TOP_PADDING, rawModulationMaxY));
 
             const datasets = [];
 
             curves.forEach((c, i) => {
                 const hue = i * 137 % 360;
                 const baseColor = `hsl(${hue}, 70%, 50%)`;
-                const dimColor  = `hsl(${hue}, 50%, 65%)`;
+                const dimColor = `hsl(${hue}, 70%, 95%)`;
+                const modulationColors = [
+                    baseColor,
+                    `hsl(${hue}, 70%, 75%)`, 
+                    `hsl(${hue}, 70%, 80%)`, 
+                    `hsl(${hue}, 70%, 85%)`, 
+                    `hsl(${hue}, 70%, 90%)`]
 
-                let points = [{x: c.x1, y: c.y1}, {x: c.x2, y: c.y2}].sort((a,b)=>a.x-b.x);
-                const left  = points[0];
-                const right = points[1];
-
-                const hasAdjustment = (c.offset !== 0 || c.frostBoostIdx > 0 || c.modStep !== 0);
-
-                const epsilon = 0.1;
-
-                let xs = [];
-                for (let t = Math.floor(displayMinX); t <= Math.ceil(displayMaxX); t++) {
-                    xs.push(t);
-                }
-                xs.push(left.x, right.x);
-
-                const preset = frostBoostPresets[c.frostBoostIdx || 0];
-                if (preset && preset.increase > 0) {
-                    const half = preset.span / 2;
-                    const start = -half;
-                    const end = half;
-                    xs.push(start - epsilon, start, end, end + epsilon);
-                }
-
-                xs = [...new Set(xs)].sort((a, b) => a - b);
-
-                const dataOffset = xs.map(x => ({x: x, y: getLWTForCurve(c, x, true)}));
-
-                datasets.push({
-                    label: hasAdjustment ? `${c.name} (adjusted)` : `${c.name}`,
-                    data: dataOffset,
-                    borderColor: baseColor,
-                    backgroundColor: baseColor,
-                    borderWidth: 3,
-                    pointRadius: hasAdjustment ? 0 : ctx => {
-                        const x = ctx.parsed.x;
-                        return (Math.abs(x - left.x) < epsilon || Math.abs(x - right.x) < epsilon) ? 6 : 0;
-                    },
-                    tension: 0
-                });
-
-                if (hasAdjustment) {
-                    const dataBase = xs.map(x => ({x: x, y: getLWTForCurve(c, x, false)}));
-
+                const hasOffsetAdj = c.offset !== 0;
+                const hasFrostAdj = c.frostBoostIdx > 0;
+                const hasAnyAdj = hasOffsetAdj || hasFrostAdj;
+                if (showBaseCurve) {
                     datasets.push({
-                        label: `${c.name} (base)`,
-                        data: dataBase,
-                        borderColor: dimColor,
-                        backgroundColor: dimColor,
-                        borderWidth: 2,
-                        borderDash: [4, 3],
+                        label: c.name,
+                        data: xs.map(x => ({x, y: getLWTForCurve(c, x)})),
+                        borderColor: baseColor,
+                        backgroundColor: baseColor,
+                        borderWidth: 3,
+                        borderDash: [],
+                        tension: 0,
                         pointRadius: ctx => {
-                            const x = ctx.parsed.x;
-                            return (Math.abs(x - left.x) < epsilon || Math.abs(x - right.x) < epsilon) ? 6 : 0;
-                        },
-                        pointHoverRadius: ctx => {
-                            const x = ctx.parsed.x;
-                            return (Math.abs(x - left.x) < epsilon || Math.abs(x - right.x) < epsilon) ? 6 : 0;
-                        },
-                        tension: 0
+                            const xVal = ctx.parsed.x;
+                            return (Math.abs(xVal - c.x1) < epsilon || Math.abs(xVal - c.x2) < epsilon) ? 6 : 0;
+                        }
                     });
+                }
+
+                if (showFinalLWT || showModulation) {
+                    datasets.push({
+                        label: `With offsets`,
+                        data: xs.map(x => ({x, y: getLWTForCurve(c, x, true, true)})),
+                        borderColor: baseColor,
+                        borderWidth: 2,
+                        borderDash: [],
+                        tension: 0,
+                        pointRadius: 0
+                    });
+                }
+
+                if (showModulation && c.maxMod) {
+                    for (modStep = -MOD_STEPS; modStep <= MOD_STEPS; modStep++) {
+                        if (modStep === 0) continue;    // already drawn above
+                        datasets.push({
+                            label: modStep == 2 ? `Modulation` : `Hidden in legend`,
+                            data: xs.map(x => ({x, y: getLWTForCurve(c, x, true, true, modStep)})),
+                            borderColor: modulationColors[Math.abs(modStep)],
+                            backgroundColor: modulationColors[Math.abs(modStep)],
+                            borderWidth: 1,
+                            borderDash: [],
+                            tension: 0,
+                            pointRadius: 0,
+                            hoverRadius: 0
+                        });
+                    }
                 }
             });
 
@@ -624,13 +655,40 @@
 
             curves.forEach((c, i) => {
                 const hue = i * 137 % 360;
-                baseAnnotations[`hLine${i}`] = {
+                baseAnnotations[`hLine${i}_base`] = {
+                    type: 'line',
+                    scaleID: 'y',
+                    value: null,
+                    borderColor: `hsl(${hue}, 70%, 60%)`,
+                    borderWidth: 1.5,
+                    borderDash: [6,4],
+                    label: { display: false, content: '', position: 'start', backgroundColor: `hsl(${hue}, 70%, 60%)`, color: '#fff', font: {size:11, weight:'bold'}, padding:5, borderRadius:4 }
+                };
+                baseAnnotations[`hLine${i}_offset`] = {
+                    type: 'line',
+                    scaleID: 'y',
+                    value: null,
+                    borderColor: `hsl(${hue}, 70%, 60%)`,
+                    borderWidth: 1.5,
+                    borderDash: [6,4],
+                    label: { display: false, content: '', position: 'start', backgroundColor: `hsl(${hue}, 70%, 60%)`, color: '#fff', font: {size:11, weight:'bold'}, padding:5, borderRadius:4 }
+                };
+                baseAnnotations[`hLine${i}_maxmod`] = {
+                    type: 'line',
+                    scaleID: 'y',
+                    value: null,
+                    borderColor: `hsl(${hue}, 70%, 60%)`,
+                    borderWidth: 1.5,
+                    borderDash: [6,4],
+                    label: { display: false, content: '', position: 'start', backgroundColor: `hsl(${hue}, 70%, 60%)`, color: '#fff', font: {size:11, weight:'bold'}, padding:5, borderRadius:4 }
+                };
+                baseAnnotations[`hLine${i}_minmod`] = {
                     type: 'line',
                     scaleID: 'y',
                     value: null,
                     borderColor: `hsl(${hue}, 70%, 50%)`,
                     borderWidth: 1.5,
-                    borderDash: [6,4],
+                    borderDash: [10,4],
                     label: { display: false, content: '', position: 'start', backgroundColor: `hsl(${hue}, 70%, 50%)`, color: '#fff', font: {size:11, weight:'bold'}, padding:5, borderRadius:4 }
                 };
             });
@@ -643,7 +701,17 @@
                     interaction: { mode: 'nearest', intersect: false, axis: 'x' },
                     plugins: {
                         tooltip: { enabled: false },
-                        legend: { position: 'top', labels: { usePointStyle: false, boxWidth: 40, boxHeight: 0 }},
+                        legend: { 
+                            position: 'top', 
+                            labels: { 
+                                usePointStyle: false, 
+                                boxWidth: 20, 
+                                boxHeight: 0,
+                                filter: (legendItem, chartData) => {
+                                    return (legendItem.text !== 'Hidden in legend');
+                                }
+                            }
+                        },
                         annotation: { annotations: baseAnnotations }
                     },
                     scales: {
@@ -712,9 +780,12 @@
                 chart.options.plugins.annotation.annotations.vLine.value = null;
                 chart.options.plugins.annotation.annotations.vLine.label.display = false;
                 curves.forEach((_, i) => {
-                    const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
-                    h.value = null;
-                    h.label.display = false;
+                    ["_base", "_offset", "_maxmod"].forEach(suffix => {
+                         const h = chart.options.plugins.annotation.annotations[`hLine${i}${suffix}`];
+                         if (!h) return;
+                         h.value = null;
+                         h.label.display = false;
+                    });
                 });
                 chart.update('none');
                 return;
@@ -725,12 +796,30 @@
             chart.options.plugins.annotation.annotations.vLine.label.display = true;
 
             curves.forEach((c, i) => {
-                const lwt = getLWTForCurve(c, oatVal, true);
-                const rounded = Math.round(lwt * 10) / 10;
-                const h = chart.options.plugins.annotation.annotations[`hLine${i}`];
-                h.value = rounded;
-                h.label.content = `LWT: ${rounded} °C`;
-                h.label.display = true;
+                if (showBaseCurve) {
+                    let lwt = getLWTForCurve(c, oatVal, true);
+                    let rounded = Math.round(lwt * 10) / 10;
+                    let h = chart.options.plugins.annotation.annotations[`hLine${i}_base`];
+                    h.value = rounded;
+                    h.label.content = `LWT from curve: ${rounded} °C`;
+                    h.label.display = true;
+                }
+                if (showFinalLWT || (showModulation && c.maxMod)) {
+                    lwt = getLWTForCurve(c, oatVal, true, true);
+                    rounded = Math.round(lwt * 10) / 10;
+                    h = chart.options.plugins.annotation.annotations[`hLine${i}_offset`];
+                    h.value = rounded;
+                    h.label.content = (showFinalLWT ? "With offsets" : "No modulation") + `: ${rounded} °C`;
+                    h.label.display = true;
+                }
+                if (showModulation && c.maxMod) {
+                    lwt = getLWTForCurve(c, oatVal, true, true, 4);
+                    rounded = Math.round(lwt * 10) / 10;
+                    h = chart.options.plugins.annotation.annotations[`hLine${i}_maxmod`];
+                    h.value = rounded;
+                    h.label.content = `With max mod.: ${rounded} °C`;
+                    h.label.display = true;
+                }
             });
 
             chart.update('none');
@@ -740,10 +829,10 @@
             const parts = [];
             curves.forEach((c, i) => {
                 let curveStr = `${c.x1}${SEPARATOR}${c.y1}${SEPARATOR}${c.x2}${SEPARATOR}${c.y2}`;
-                const hasExtra = c.offset !== 0 || c.modStep !== 0 || c.maxMod != null || c.hmin != null || c.hmax != null || c.frostBoostIdx > 0;
+                const hasExtra = c.offset !== 0 || c.maxMod != null || c.hmin != null || c.hmax != null || c.frostBoostIdx > 0;
                 if (hasExtra) {
                     curveStr += `${SEPARATOR}${c.offset}`;
-                    curveStr += `${SEPARATOR}${c.modStep}`;
+                    curveStr += `${SEPARATOR}0`;
                     curveStr += `${SEPARATOR}${c.maxMod ?? ''}`;
                     curveStr += `${SEPARATOR}${c.hmin ?? ''}${SEPARATOR}${c.hmax ?? ''}${SEPARATOR}${c.frostBoostIdx ?? 0}`;
                 }
@@ -751,6 +840,14 @@
                 parts.push(`name${i+1}=${encodeURIComponent(c.name)}`);
             });
             if (!isNaN(oat)) parts.push(`oat=${oat}`);
+
+            const showParts = [];
+            if (showBaseCurve)   showParts.push('base');
+            if (showFinalLWT)    showParts.push('final');
+            if (showModulation)  showParts.push('mod');
+            if (!showBaseCurve || !showFinalLWT || showModulation) {
+                parts.push("show=" + showParts.join(','));
+            }
 
             parts.sort();
             const query = parts.join('&');
@@ -775,6 +872,11 @@
                 oat = parseFloat(params.get('oat'));
             }
 
+            const showParam = params.get('show') || 'base,final';
+            showBaseCurve   = showParam.includes('base');
+            showFinalLWT    = showParam.includes('final');
+            showModulation  = showParam.includes('mod');
+
             const curveKeys = [...params.keys()]
                 .filter(k => k.startsWith('curve'))
                 .map(k => parseInt(k.match(/curve(\d+)/)?.[1] ?? -1))
@@ -783,7 +885,6 @@
 
             if (curveKeys.length === 0) {
                 addCurve();
-                return;
             }
 
             const maxIdx = Math.max(...curveKeys);
@@ -802,9 +903,9 @@
 
                 if ([x1,y1,x2,y2].some(isNaN)) continue;
 
-                let offset = 0, modStep = 0, maxMod = null, hmin = null, hmax = null, frostBoostIdx = 0;
+                let offset = 0, maxMod = null, hmin = null, hmax = null, frostBoostIdx = 0;
                 if (rest.length >= 1) offset    = parseFloat(rest[0]) || 0;
-                if (rest.length >= 2) modStep   = parseFloat(rest[1]) || 0;
+                // rest[1] used to be modStep, but was removed
                 if (rest.length >= 3) maxMod    = rest[2] ? parseFloat(rest[2]) : null;
                 if (rest.length >= 5) {
                     hmin = rest[3] ? parseFloat(rest[3]) : null;
@@ -817,7 +918,7 @@
 
                 const name = params.has(`name${i}`) ? decodeURIComponent(params.get(`name${i}`)) : null;
 
-                addCurve({x1, y1, x2, y2, name, offset, modStep, maxMod, hmin, hmax, frostBoostIdx});
+                addCurve({x1, y1, x2, y2, name, offset, maxMod, hmin, hmax, frostBoostIdx});
             }
 
             if (!isNaN(oat)) {
@@ -825,7 +926,12 @@
                 calculateLWT();
                 displayDefaultCrosshair();
             }
-        }
+
+            document.getElementById('show-base-curve').checked = showBaseCurve;
+            document.getElementById('show-final-lwt').checked = showFinalLWT;
+            document.getElementById('show-modulation').checked = !showFinalLWT && showModulation;
+            document.getElementById('show-modulation').disabled = !showFinalLWT;
+        }   
 
         function calculateLWT() {
             const container = document.getElementById('lwt-results');
@@ -833,7 +939,7 @@
             if (isNaN(oat)) return;
 
             curves.forEach(c => {
-                const lwt = getLWTForCurve(c, oat, true);
+                const lwt = getLWTForCurve(c, oat, true, true);
                 const p = document.createElement('p');
                 p.textContent = `${c.name}: LWT = ${lwt.toFixed(1)} °C`;
                 container.appendChild(p);
@@ -865,7 +971,6 @@
                         x1: last.x1, y1: last.y1 - 5,
                         x2: last.x2, y2: last.y2,
                         offset: last.offset,
-                        modStep: last.modStep,
                         maxMod: last.maxMod,
                         hmin: last.hmin,
                         hmax: last.hmax,
@@ -880,6 +985,31 @@
                 displayDefaultCrosshair();
                 updateURL();
             });
+
+            document.getElementById('show-base-curve').addEventListener('change', e => {
+                showBaseCurve = e.target.checked;
+                updateChart();
+                displayDefaultCrosshair();
+                updateURL();
+            });
+            document.getElementById('show-final-lwt').addEventListener('change', e => {
+                showFinalLWT = e.target.checked;
+                document.getElementById('show-modulation').disabled = !showFinalLWT;
+                if (!showFinalLWT) {
+                    showModulation = false;
+                    document.getElementById('show-modulation').checked = false;
+                }
+                updateChart();
+                displayDefaultCrosshair();
+                updateURL();
+            });
+            document.getElementById('show-modulation').addEventListener('change', e => {
+                showModulation = e.target.checked;
+                updateChart();
+                displayDefaultCrosshair();
+                updateURL();
+            });
+            
         });
     </script>
 
