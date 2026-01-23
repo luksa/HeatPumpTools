@@ -608,12 +608,12 @@
                         tension: 0,
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            if (oat && isEqual(xVal, oat)) return 3;
+                            if (!isNaN(oat) && isEqual(xVal, oat)) return 3;
                             return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 6 : 0;
                         },
                         hoverRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            if (oat && isEqual(xVal, oat)) return 4;
+                            if (!isNaN(oat) && isEqual(xVal, oat)) return 4;
                             return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 7 : 3;
                         }
                     });
@@ -630,11 +630,11 @@
                         tension: 0,
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            return (oat && isEqual(xVal, oat)) ? 3 : 0;
+                            return (!isNaN(oat) && isEqual(xVal, oat)) ? 3 : 0;
                         },
                         hoverRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            if (oat && isEqual(xVal, oat)) return 4;
+                            if (!isNaN(oat) && isEqual(xVal, oat)) return 4;
                             return 3;
                         }
                     });
@@ -653,11 +653,11 @@
                             tension: 0,
                             pointRadius: modStep != MOD_STEPS ? 0 : ctx => {
                                 const xVal = ctx.parsed.x;
-                                return (oat && isEqual(xVal, oat)) ? 4 : 0;
+                                return (!isNaN(oat) && isEqual(xVal, oat)) ? 4 : 0;
                             },
                             hoverRadius: modStep != MOD_STEPS ? 0 : ctx => {
                                 const xVal = ctx.parsed.x;
-                                if (oat && isEqual(xVal, oat)) return 4;
+                                if (!isNaN(oat) && isEqual(xVal, oat)) return 4;
                                 return 3;
                             }
                         });
