@@ -784,6 +784,24 @@
                     afterEvent: (ch, args) => {
                         if (args.event.type === 'mouseout') displayDefaultCrosshair();
                     }
+                }, {
+                    id: 'updateOATOnClick',
+                    afterEvent: (ch, args) => {
+                        if (args.event.type === 'click') {
+                            const area = chart.chartArea;
+                            if (!area) return;
+                            const x = args.event.x, y = args.event.y;
+                            if (x < area.left || x > area.right || y < area.top || y > area.bottom) return;
+                            
+                            const xVal = chart.scales.x.getValueForPixel(x);
+                            const roundedX = Math.round(xVal);
+                            
+                            oat = roundedX;
+                            document.getElementById('oat-input').value = roundedX;
+                            calculateLWT();
+                            updateURL();
+                        }
+                    }
                 }]
             });
         }
