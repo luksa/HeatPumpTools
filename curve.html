@@ -458,6 +458,14 @@
             return Math.abs(val1 - val2) < epsilon;
         }
 
+        function isCurveEndpoint(x, curve) {
+            return isEqual(x, curve.x1) || isEqual(x, curve.x2);
+        }
+
+        function isOat(x) {
+            return !isNaN(oat) && isEqual(x, oat);
+        }
+       
         function updateAll() {
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
@@ -608,13 +616,11 @@
                         tension: 0,
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            if (!isNaN(oat) && isEqual(xVal, oat)) return 3;
-                            return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 6 : 0;
+                            return isCurveEndpoint(xVal, c) ? 6 : (isOat(xVal) ? 3 : 0);
                         },
                         hoverRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            if (!isNaN(oat) && isEqual(xVal, oat)) return 4;
-                            return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 7 : 3;
+                            return isCurveEndpoint(xVal, c) ? 7 : (isOat(xVal) ? 4 : 3);
                         }
                     });
                 }
@@ -629,13 +635,10 @@
                         borderDash: [],
                         tension: 0,
                         pointRadius: ctx => {
-                            const xVal = ctx.parsed.x;
-                            return (!isNaN(oat) && isEqual(xVal, oat)) ? 3 : 0;
+                            return isOat(ctx.parsed.x) ? 3 : 0;
                         },
                         hoverRadius: ctx => {
-                            const xVal = ctx.parsed.x;
-                            if (!isNaN(oat) && isEqual(xVal, oat)) return 4;
-                            return 3;
+                            return isOat(ctx.parsed.x) ? 4 : 3;
                         }
                     });
                 }
@@ -652,13 +655,10 @@
                             borderDash: [],
                             tension: 0,
                             pointRadius: modStep != MOD_STEPS ? 0 : ctx => {
-                                const xVal = ctx.parsed.x;
-                                return (!isNaN(oat) && isEqual(xVal, oat)) ? 4 : 0;
+                                return isOat(ctx.parsed.x) ? 4 : 0;
                             },
                             hoverRadius: modStep != MOD_STEPS ? 0 : ctx => {
-                                const xVal = ctx.parsed.x;
-                                if (!isNaN(oat) && isEqual(xVal, oat)) return 4;
-                                return 3;
+                                return isOat(ctx.parsed.x) ? 4 : 3;
                             }
                         });
                     }
