@@ -165,7 +165,6 @@
         let showBaseCurve = false;
         let showFinalLWT = false;
         let showModulation = false;
-        let displayingDefaultCrossHair = false;
 
         const frostBoostPresets = [
             { label: "None",              increase: 0,   span: 0   },
@@ -609,12 +608,13 @@
                         tension: 0,
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            if (displayingDefaultCrossHair && oat && isEqual(xVal, oat)) return 3;
+                            if (oat && isEqual(xVal, oat)) return 3;
                             return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 6 : 0;
                         },
                         hoverRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            return (isEqual(xVal - c.x1) || isEqual(xVal, c.x2)) ? 7 : 4;
+                            if (oat && isEqual(xVal, oat)) return 4;
+                            return (isEqual(xVal, c.x1) || isEqual(xVal, c.x2)) ? 7 : 3;
                         }
                     });
                 }
@@ -630,9 +630,13 @@
                         tension: 0,
                         pointRadius: ctx => {
                             const xVal = ctx.parsed.x;
-                            return (displayingDefaultCrossHair && oat && isEqual(xVal, oat)) ? 3.5 : 0;
+                            return (oat && isEqual(xVal, oat)) ? 3 : 0;
                         },
-                        hoverRadius: 4
+                        hoverRadius: ctx => {
+                            const xVal = ctx.parsed.x;
+                            if (oat && isEqual(xVal, oat)) return 4;
+                            return 3;
+                        }
                     });
                 }
 
@@ -649,9 +653,13 @@
                             tension: 0,
                             pointRadius: modStep != MOD_STEPS ? 0 : ctx => {
                                 const xVal = ctx.parsed.x;
-                                return (displayingDefaultCrossHair && oat && isEqual(xVal, oat)) ? 4 : 0;
+                                return (oat && isEqual(xVal, oat)) ? 4 : 0;
                             },
-                            hoverRadius: modStep == MOD_STEPS ? 4 : 0
+                            hoverRadius: modStep != MOD_STEPS ? 0 : ctx => {
+                                const xVal = ctx.parsed.x;
+                                if (oat && isEqual(xVal, oat)) return 4;
+                                return 3;
+                            }
                         });
                     }
                 }
@@ -755,7 +763,6 @@
                             displayDefaultCrosshair();
                             return;
                         }
-                        displayingDefaultCrossHair = false;
                         const xVal = chart.scales.x.getValueForPixel(x);
 
                         let snapped;
@@ -799,6 +806,7 @@
                             oat = roundedX;
                             document.getElementById('oat-input').value = roundedX;
                             calculateLWT();
+                            displayDefaultCrosshair();
                             updateURL();
                         }
                     }
@@ -807,7 +815,6 @@
         }
 
         function displayDefaultCrosshair() {
-            displayingDefaultCrossHair = true;
             displayCrosshair(oat);
         }
 
