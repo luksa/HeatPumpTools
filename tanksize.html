@@ -137,10 +137,10 @@
             }
 
             // Update display
-            equivVolumeEl.textContent = V2.toFixed(1);
+            equivVolumeEl.textContent = V2.toFixed(0);
 
             if (isValid) {
-                tankVolumeEl.textContent = V1.toFixed(1);
+                tankVolumeEl.textContent = V1.toFixed(0);
                 tankVolumeEl.classList.remove('text-danger');
                 tankVolumeEl.classList.add('text-success');
             } else {
