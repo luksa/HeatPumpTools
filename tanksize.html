@@ -68,7 +68,7 @@
                         </form>
 
                         <div class="d-grid">
-                                <button type="submit" class="btn btn-primary btn-lg">Calculate Tank Size</button>
+                                <button type="button" id="calcButton" class="btn btn-primary btn-lg">Calculate Tank Size</button>
                         </div>
                     </div>
                 </div>
@@ -113,6 +113,7 @@
         const equivVolumeEl = document.getElementById('equivVolume');
         const tankVolumeEl  = document.getElementById('tankVolume');
         const resultsCard   = document.getElementById('results');
+        const calcButton    = document.getElementById('calcButton');
 
         // Calculate function
         function calculate() {
@@ -155,6 +156,12 @@
         inputs.forEach(input => {
             input.addEventListener('input', calculate);
             input.addEventListener('change', calculate);
+        });
+
+        // Button click handler
+        calcButton.addEventListener('click', function() {
+            calculate();
+            resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
         // Initial calculation
